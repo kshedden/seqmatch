@@ -1,0 +1,47 @@
+package utils
+
+import (
+	"bufio"
+	"os"
+	"path"
+
+	"github.com/golang/snappy"
+)
+
+// readInSeq reads the sequencing reads, returns names and sequences
+func readInSeq(seqfile, dpath string) ([]string, []string) {
+	inf, err := os.Open(path.Join(dpath, seqfile))
+	if err != nil {
+		panic(err)
+	}
+	defer inf.Close()
+	rdr := snappy.NewReader(inf)
+
+	var names []string
+	var seqv []string
+
+	scanner := bufio.NewScanner(rdr)
+
+	for j := 0; scanner.Scan(); j++ {
+
+		switch j % 4 {
+		case 0:
+			nm := scanner.Text()
+			names = append(names, nm)
+		case 1:
+			seq := scanner.Text()
+			seqv = append(seqv, seq)
+		}
+
+		if err := scanner.Err(); err != nil {
+			panic(err)
+		}
+
+		// DEBUG
+		if len(names) == 1000 && len(seqv) == 1000 {
+			break
+		}
+	}
+
+	return names, seqv
+}
