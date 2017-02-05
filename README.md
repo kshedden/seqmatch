@@ -1,21 +1,23 @@
+Outline of strategy:
+
 1. Run compress.go to convert the raw sequence and target files to
 gzip compressed files.  In these files, one sequence is placed on each
-line, with the structure: <sequence id><tab><sequence><newline>.
-Sequence elements other than A/T/G/C are converted to X.
+line, with the structure: sequence id/tab/sequence/newline.  Sequence
+elements other than A/T/G/C are converted to X.
 
 2. Run genseqdb.go separately for sources and targets to generate two
 leveldb databases of the sequences.
 
-(steps 1-2 above are not significant in overall run-time)
+  (steps 1-2 above are not significant in overall run-time)
 
 3. Run genhash.go to generate a bunch of hashes, saving only the
 tails.  Each tail tells us that ~20K source sequences can only match
 into a common set of ~60K target sequences.  Currently we generate 100
 hashes per run but we need more, perhaps 500 (counts as 1000 because
-we use min and max).  Currently this is much too slow (need to profile
-and find a better hashing strategy).  Aim to get this to under 24
-hours per 1000 hashes.  Then each run would cover around 20 million
-source sequences (20K/hash * 1K hashes).
+we use min and max for each hash).  Currently this is much too slow
+(need to profile and find a better hashing strategy).  Aim to get this
+to under 24 hours per 1000 hashes.  Then each run would cover around
+20 million source sequences (20K/hash * 1K hashes).
 
 4. Run prochash.go to do brute-force sequence comparisons of
 everything found in step 3.  We can do 400K sequence comparisons per
