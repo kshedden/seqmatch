@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"encoding/binary"
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -15,10 +14,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/OneOfOne/xxhash"
+	"github.com/chmduquesne/rollinghash/buzhash"
 )
 
-var (
+const (
 	// File containing sequence reads we are matching (source of matching)
 	sourcefile string = "PRT_NOV_15_02.txt.gz"
 
@@ -28,68 +27,80 @@ var (
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
 
-	// A log
-	logger *log.Logger
-
 	// Number of hashes
 	nhash int = 100
 
 	// The kmer length of each hash
 	hashlen int = 20
 
+	// Limit concurrency to this amount
+	concurrency int = 100
+
 	// Only keep if the minhash/maxhash is beyond this threshold in magnitude
-	hashbase  uint64 = 2 << 32
-	minthresh uint64
-	maxthresh uint64
+	minthresh uint32 = 4096
+	maxthresh uint32 = 4294965000
 )
 
-func genSalt() [][]byte {
+var (
+	// A log
+	logger *log.Logger
+)
 
-	x := make([][]byte, nhash)
+func genTables() [][256]uint32 {
+
+	tables := make([][256]uint32, nhash)
 	for j := 0; j < nhash; j++ {
-		x[j] = make([]byte, 16)
-		for k := 0; k < 4; k++ {
-			x[j][k] = byte(rand.Int() % 256)
+
+		mp := make(map[uint32]bool)
+		for i := 0; i < hashlen; i++ {
+			for {
+				x := uint32(rand.Int63())
+				if !mp[x] {
+					tables[j][i] = x
+					mp[x] = true
+					break
+				}
+			}
+
 		}
 	}
 
-	return x
+	return tables
 }
 
 // Returns the minimum and maximum of the hash applied to the given sequence
-func gethash(isq []byte, salt []byte) (uint64, uint64) {
+func gethash(seq []byte, table [256]uint32) (uint32, uint32) {
 
-	var minhash, maxhash uint64
-	ha := xxhash.New64()
+	ha := buzhash.NewFromByteArray(table)
 
-	for j := 0; j <= len(isq)-hashlen; j++ {
-		ha.Reset()
-		ha.Write(salt)
-		ha.Write(isq[j : j+hashlen])
-		x := ha.Sum64() % hashbase
-		if j == 0 || x < minhash {
-			minhash = x
+	ha.Write(seq[0:hashlen])
+
+	min := ha.Sum32()
+	max := min
+
+	for j := hashlen; j < len(seq); j++ {
+
+		ha.Roll(seq[j])
+		u := ha.Sum32()
+
+		if u < min {
+			min = u
 		}
-		if j == 0 || x > maxhash {
-			maxhash = x
+		if u > max {
+			max = u
 		}
 	}
 
-	return minhash, maxhash
+	return min, max
 }
 
 type qrec struct {
 	pos  uint32
-	hash uint64
-	ch   int
+	hash uint32
+	ch   uint16
 }
 
-type prec struct {
-	pos  uint32
-	hash uint64
-}
-
-func genhash(salt [][]byte, infile string, wg *sync.WaitGroup) {
+func genhash(tables [][256]uint32, infile string, wg *sync.WaitGroup) {
 
 	var infname string
 	var outdirname string
@@ -113,7 +124,7 @@ func genhash(salt [][]byte, infile string, wg *sync.WaitGroup) {
 	}
 	defer gzr.Close()
 
-	nhash := len(salt)
+	nhash := len(tables)
 
 	// Set up a scanner to read long lines
 	scanner := bufio.NewScanner(gzr)
@@ -121,26 +132,21 @@ func genhash(salt [][]byte, infile string, wg *sync.WaitGroup) {
 	scanner.Buffer(sbuf, 1024*1024)
 
 	// Create files to store the results.
-	outmin := make([]*os.File, nhash)
-	outmax := make([]*os.File, nhash)
-	for j := 0; j < nhash; j++ {
-		oname := path.Join(outdirname, fmt.Sprintf("min%04d.bin", j))
-		outmin[j], err = os.Create(oname)
-		if err != nil {
-			panic(err)
-		}
-		defer outmin[j].Close()
-		oname = path.Join(outdirname, fmt.Sprintf("max%04d.bin", j))
-		outmax[j], err = os.Create(oname)
-		if err != nil {
-			panic(err)
-		}
-		defer outmax[j].Close()
+	oname := path.Join(outdirname, "min.bin")
+	outmin, err := os.Create(oname)
+	if err != nil {
+		panic(err)
 	}
+	defer outmin.Close()
+	oname = path.Join(outdirname, "max.bin")
+	outmax, err := os.Create(oname)
+	if err != nil {
+		panic(err)
+	}
+	defer outmax.Close()
 
 	minchan := make(chan qrec)
 	maxchan := make(chan qrec)
-	concurrency := 100
 	limit := make(chan bool, concurrency)
 	alldone := make(chan bool, 1)
 
@@ -152,8 +158,7 @@ func genhash(salt [][]byte, infile string, wg *sync.WaitGroup) {
 				if !ok {
 					minchan = nil
 				} else {
-					p := prec{r.pos, r.hash}
-					err = binary.Write(outmin[r.ch], binary.LittleEndian, &p)
+					err = binary.Write(outmin, binary.LittleEndian, &r)
 					if err != nil {
 						panic(err)
 					}
@@ -162,8 +167,7 @@ func genhash(salt [][]byte, infile string, wg *sync.WaitGroup) {
 				if !ok {
 					maxchan = nil
 				} else {
-					p := prec{r.pos, r.hash}
-					err = binary.Write(outmax[r.ch], binary.LittleEndian, &p)
+					err = binary.Write(outmax, binary.LittleEndian, &r)
 					if err != nil {
 						panic(err)
 					}
@@ -191,20 +195,20 @@ func genhash(salt [][]byte, infile string, wg *sync.WaitGroup) {
 		}
 
 		toks := strings.Split(line, "\t")
-		gsq := toks[1]
+		seq := toks[1]
 
 		limit <- true
 		go func(isq []uint8, lnum int) {
 			for ci := 0; ci < nhash; ci++ {
-				minhash, maxhash := gethash([]byte(gsq), salt[ci])
+				minhash, maxhash := gethash([]byte(seq), tables[ci])
 				if minhash < minthresh {
-					minchan <- qrec{uint32(lnum), minhash, ci}
+					minchan <- qrec{uint32(lnum), minhash, uint16(ci)}
 				} else if maxhash > maxthresh {
-					maxchan <- qrec{uint32(lnum), maxhash, ci}
+					maxchan <- qrec{uint32(lnum), maxhash, uint16(ci)}
 				}
 			}
 			<-limit
-		}([]byte(gsq), lnum)
+		}([]byte(seq), lnum)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -234,14 +238,12 @@ func main() {
 
 	setupLogger()
 
-	salt := genSalt()
-
-	minthresh = hashbase / 1000000
-	maxthresh = hashbase - minthresh
+	tables := genTables()
 
 	var wg sync.WaitGroup
+
 	wg.Add(2)
-	go genhash(salt, sourcefile, &wg)
-	go genhash(salt, targetfile, &wg)
+	go genhash(tables, sourcefile, &wg)
+	go genhash(tables, targetfile, &wg)
 	wg.Wait()
 }
