@@ -209,10 +209,6 @@ func check() {
 				}
 			}
 			if g {
-				m := 120
-				if m > len(seq) {
-					m = len(seq)
-				}
 				hitchan <- rec{seq: string(seq), target: uint32(i), pos: 0}
 			}
 
