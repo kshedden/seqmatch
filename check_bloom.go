@@ -39,6 +39,7 @@ var (
 	logger *log.Logger
 )
 
+// readChecks selects some candidate match sequences at random
 func readChecks() {
 
 	fid, err := os.Open(path.Join(dpath, matchfile))
@@ -69,6 +70,7 @@ func readChecks() {
 	}
 }
 
+// checks compares the selected candidate matches to the actual reads to confirm that they are there
 func check() {
 
 	fid, err := os.Open(path.Join(dpath, sourcefile))
@@ -86,16 +88,17 @@ func check() {
 	nmatch := 0
 
 	for j := 0; scanner.Scan(); j++ {
-		seq := scanner.Text()
+		line := scanner.Text()
+		toks := strings.Fields(line)
+		seq := toks[1]
 		if len(seq) < sw {
 			continue
 		}
 		for j, ck := range checks {
 			if !match[j] {
-				if strings.Contains(seq, ck) {
+				if seq[0:sw] == ck {
 					match[j] = true
 					nmatch++
-					print(nmatch, "\n")
 				}
 			}
 		}
