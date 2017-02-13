@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"log"
 	"os"
@@ -12,16 +13,18 @@ import (
 	"github.com/kshedden/seqmatch/utils"
 )
 
-var (
+const (
 	targetfile string = "ALL_ABFVV_Genes_Derep.txt"
 
 	sourcefile string = "PRT_NOV_15_02.fastq"
 
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
 
-	logger *log.Logger
-
 	gzlevel int = 1
+)
+
+var (
+	logger *log.Logger
 )
 
 // Compress but restructure to have the same format as the target file
@@ -55,12 +58,9 @@ func source(wg *sync.WaitGroup) {
 			logger.Printf("sources: %d\n", lnum)
 		}
 
-		outw.Write([]byte(ris.Name))
-		outw.Write([]byte("\t"))
-
 		x := []byte(ris.Seq)
-		for i, _ := range x {
-			if x[i] != 'A' && x[i] != 'T' && x[i] != 'G' && x[i] != 'C' {
+		for i, c := range x {
+			if !bytes.Contains([]byte("ATGC"), []byte{c}) {
 				x[i] = 'X'
 			}
 		}
@@ -120,13 +120,15 @@ func targets(wg *sync.WaitGroup) {
 		nam := toks[0]
 		seq := []byte(toks[1])
 
-		outw.Write([]byte(nam))
-		outw.Write([]byte("\t"))
-
-		for i, _ := range seq {
-			if seq[i] != 'A' && seq[i] != 'T' && seq[i] != 'G' && seq[i] != 'C' {
+		for i, c := range seq {
+			if !bytes.Contains([]byte("ATGC"), []byte{c}) {
 				seq[i] = 'X'
 			}
+		}
+
+		_, err = outw.Write([]byte(nam + "\t"))
+		if err != nil {
+			panic(err)
 		}
 		_, err = outw.Write(seq)
 		if err != nil {
