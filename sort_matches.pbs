@@ -25,4 +25,5 @@ if [ -n "$PBS_NODEFILE" ]; then cat $PBS_NODEFILE; fi
 if [ -n "$PBS_O_WORKDIR" ]; then cd $PBS_O_WORKDIR; fi
 
 #  Put your job commands here:
+export LC_ALL=C
 zcat /scratch/andjoh_fluxm/tealfurn/CSCAR/bloom_matches.txt.gz | sort --parallel=8 | gzip > /scratch/andjoh_fluxm/tealfurn/CSCAR/bloom_matches_sorted.txt.gz
