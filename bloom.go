@@ -233,7 +233,7 @@ func check() {
 				}
 				if g {
 					// Match
-					hitchan <- rec{seq: string(seq[j-sw+1 : length(seq)]), target: uint32(i), pos: uint32(j - sw + 1)}
+					hitchan <- rec{seq: string(seq[j-sw+1 : len(seq)]), target: uint32(i), pos: uint32(j - sw + 1)}
 				}
 			}
 			<-limit
