@@ -9,15 +9,18 @@ import (
 	"os"
 	"path"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 )
 
 const (
-	// File containing sequence reads we are matching (source of matching)
-	sourcefile string = "PRT_NOV_15_02_sorted.txt.gz"
+	// File containing sequence reads we are matching (source of
+	// matching); use the most upstream file that is practical to
+	// use.
+	sourcefile string = "PRT_NOV_15_02.txt.gz"
 
 	// Candidate matching sequences
-	matchfile string = "bloom_matches.txt.gz"
+	matchfile string = "refined_matches.txt.gz"
 
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
@@ -33,11 +36,18 @@ var (
 	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 	// The sequences to check
-	checks []string
+	checks []matchinfo
 
 	// A log
 	logger *log.Logger
 )
+
+type matchinfo struct {
+	target int
+	pos    int
+	weight int
+	seq    string
+}
 
 // readChecks selects some candidate match sequences at random
 func readChecks() {
@@ -58,7 +68,22 @@ func readChecks() {
 		line := scanner.Text()
 		fields := strings.Fields(line)
 		if rand.Float32() < 0.01 {
-			checks = append(checks, fields[0][0:sw])
+			var mi matchinfo
+			mi.target, err = strconv.Atoi(fields[0])
+			if err != nil {
+				panic(err)
+			}
+			mi.pos, err = strconv.Atoi(fields[1])
+			if err != nil {
+				panic(err)
+			}
+			mi.weight, err = strconv.Atoi(fields[2])
+			if err != nil {
+				panic(err)
+			}
+			mi.seq = fields[3]
+
+			checks = append(checks, mi)
 		}
 		if len(checks) >= ncheck {
 			break
@@ -88,15 +113,13 @@ func check() {
 	nmatch := 0
 
 	for j := 0; scanner.Scan(); j++ {
-		line := scanner.Text()
-		toks := strings.Fields(line)
-		seq := toks[1]
+		seq := scanner.Text()
 		if len(seq) < sw {
 			continue
 		}
 		for j, ck := range checks {
 			if !match[j] {
-				if seq[0:sw] == ck {
+				if ck.seq[0:sw] == seq[0:sw] {
 					match[j] = true
 					nmatch++
 				}
