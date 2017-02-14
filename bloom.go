@@ -127,7 +127,7 @@ func buildBloom() {
 
 type rec struct {
 	seq    string
-	target uint32
+	target string
 	pos    uint32
 }
 
@@ -168,7 +168,7 @@ func check() {
 				seq = seq[0:120]
 			}
 			wtr.Write([]byte(fmt.Sprintf("%s\t", seq)))
-			wtr.Write([]byte(fmt.Sprintf("%d\t", r.target)))
+			wtr.Write([]byte(fmt.Sprintf("%s\t", r.target)))
 			wtr.Write([]byte(fmt.Sprintf("%d\n", r.pos)))
 		}
 	}()
@@ -181,6 +181,7 @@ func check() {
 
 		line := scanner.Text()
 		toks := strings.Split(line, "\t")
+		tname := toks[0]
 		seq := toks[1]
 
 		if len(seq) < sw {
@@ -188,7 +189,7 @@ func check() {
 		}
 
 		limit <- true
-		go func(seq []byte, i int) {
+		go func(seq []byte, target string) {
 			hashes := make([]rollinghash.Hash32, nhash)
 			for j, _ := range hashes {
 				hashes[j] = buzhash.NewFromByteArray(tables[j])
@@ -209,7 +210,11 @@ func check() {
 				}
 			}
 			if g {
-				hitchan <- rec{seq: string(seq), target: uint32(i), pos: 0}
+				hitchan <- rec{
+					seq:    string(seq),
+					target: target,
+					pos:    0,
+				}
 			}
 
 			// Check the rest of the windows
@@ -229,11 +234,15 @@ func check() {
 				}
 				if g {
 					// Match
-					hitchan <- rec{seq: string(seq[j-sw+1 : len(seq)]), target: uint32(i), pos: uint32(j - sw + 1)}
+					hitchan <- rec{
+						seq:    string(seq[j-sw+1 : len(seq)]),
+						target: target,
+						pos:    uint32(j - sw + 1),
+					}
 				}
 			}
 			<-limit
-		}([]byte(seq), i)
+		}([]byte(seq), tname)
 	}
 
 	if err := scanner.Err(); err != nil {

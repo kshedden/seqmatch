@@ -1,18 +1,18 @@
 #!/bin/sh
 ####  PBS preamble
 
-#PBS -N sort_matches
+#PBS -N genseqdb_source
 
 #PBS -M kshedden@umich.edu
 #PBS -m abe
 
 # Change the number of cores (ppn=1), amount of memory, and walltime:
-#PBS -l nodes=1:ppn=10,mem=2000mb,walltime=2:00:00
+#PBS -l nodes=1:ppn=1,mem=1000mb,walltime=12:00:00
 #PBS -j oe
 #PBS -V
 
 # Change "example_flux" to the name of your Flux allocation:
-#PBS -A stats_flux
+#PBS -A lsa_flux
 #PBS -q flux
 #PBS -l qos=flux
 
@@ -25,5 +25,4 @@ if [ -n "$PBS_NODEFILE" ]; then cat $PBS_NODEFILE; fi
 if [ -n "$PBS_O_WORKDIR" ]; then cd $PBS_O_WORKDIR; fi
 
 #  Put your job commands here:
-export LC_ALL=C
-zcat /scratch/andjoh_fluxm/tealfurn/CSCAR/bloom_matches.txt.gz | sort --parallel=8 -k1 | gzip > /scratch/andjoh_fluxm/tealfurn/CSCAR/bloom_matches_sorted.txt.gz
+go run genseqdb.go source

@@ -26,17 +26,14 @@ const (
 	sw = 80
 )
 
-func madvance(scanner *bufio.Scanner) (bool, string, int, int) {
+func madvance(scanner *bufio.Scanner) (bool, string, string, int) {
 	if !scanner.Scan() {
-		return true, "", -1, -1
+		return true, "", "", -1
 	}
 	line := scanner.Text()
 	fields := strings.Fields(line)
 	seq := fields[0]
-	target, err := strconv.Atoi(fields[1])
-	if err != nil {
-		panic(err)
-	}
+	target := fields[1]
 	pos, err := strconv.Atoi(fields[2])
 	if err != nil {
 		panic(err)
@@ -96,8 +93,8 @@ func main() {
 	defer wtr.Close()
 
 	var done bool
-	var sseq, mseq string
-	var mtarget, mpos, scnt int
+	var sseq, mseq, mtarget string
+	var mpos, scnt int
 
 	_, sseq, scnt = sadvance(sscan)
 	_, mseq, mtarget, mpos = madvance(mscan)
