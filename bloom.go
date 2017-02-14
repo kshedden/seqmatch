@@ -22,7 +22,7 @@ const (
 	sourcefile string = "PRT_NOV_15_02_sorted.txt.gz"
 
 	// File containing genes we are matching into (target of matching)
-	targetfile string = "ALL_ABFVV_Genes_Derep.txt.gz"
+	targetfile string = "ALL_ABFVV_Genes_Derep_derep.txt.gz"
 
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
