@@ -67,7 +67,7 @@ func readChecks() {
 	for scanner.Scan() {
 		line := scanner.Text()
 		fields := strings.Fields(line)
-		if rand.Float32() < 0.01 {
+		if rand.Float32() < 0.0001 {
 			var mi matchinfo
 			mi.target, err = strconv.Atoi(fields[0])
 			if err != nil {
@@ -82,7 +82,6 @@ func readChecks() {
 				panic(err)
 			}
 			mi.seq = fields[3]
-
 			checks = append(checks, mi)
 		}
 		if len(checks) >= ncheck {
