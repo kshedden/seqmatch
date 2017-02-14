@@ -5,8 +5,9 @@ gzip compressed files.  In these files, one sequence is placed on each
 line, with the structure: sequence id/tab/sequence/newline.  Sequence
 elements other than A/T/G/C are converted to X.
 
-2. Run `sort_sources.pbs` to sort and de-duplicate the reads,
-retaining the count information
+2. Run `sort_sources.pbs` and `sort_targets.pbs` to sort and
+de-duplicate the sequences.  The count information is retained for the
+sources but not for the targets.
 
 3. Run `bloom.go` to identify candidate matches.
 
