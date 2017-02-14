@@ -3,8 +3,10 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
+	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -13,7 +15,9 @@ const (
 	sourcefile string = "PRT_NOV_15_02_sorted.txt.gz"
 
 	// Candidate matching sequences
-	matchfile string = "bloom_matches.txt.gz"
+	matchfile string = "bloom_matches_sorted.txt.gz"
+
+	outfile string = "refined_matches.txt.gz"
 
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
@@ -22,14 +26,36 @@ const (
 	sw = 80
 )
 
-func advance(scanner *bufio.Scanner) (bool, string, []string, string) {
+func madvance(scanner *bufio.Scanner) (bool, string, int, int) {
 	if !scanner.Scan() {
-		return true, "", nil, ""
+		return true, "", -1, -1
 	}
 	line := scanner.Text()
 	fields := strings.Fields(line)
-	seq := fields[1][0:sw]
-	return false, line, fields, seq
+	seq := fields[0]
+	target, err := strconv.Atoi(fields[1])
+	if err != nil {
+		panic(err)
+	}
+	pos, err := strconv.Atoi(fields[2])
+	if err != nil {
+		panic(err)
+	}
+	return false, seq, target, pos
+}
+
+func sadvance(scanner *bufio.Scanner) (bool, string, int) {
+	if !scanner.Scan() {
+		return true, "", -1
+	}
+	line := scanner.Text()
+	fields := strings.Fields(line)
+	seq := fields[1]
+	cnt, err := strconv.Atoi(fields[0])
+	if err != nil {
+		panic(err)
+	}
+	return false, seq, cnt
 }
 
 func main() {
@@ -40,9 +66,12 @@ func main() {
 		panic(err)
 	}
 	defer fid.Close()
-	gzr := gzip.NewReader(fid)
+	gzr, err := gzip.NewReader(fid)
+	if err != nil {
+		panic(err)
+	}
 	defer gzr.Close()
-	sscan := bufio.Scanner(gzr)
+	sscan := bufio.NewScanner(gzr)
 
 	// Read candidate match sequences
 	gid, err := os.Open(path.Join(dpath, matchfile))
@@ -50,9 +79,12 @@ func main() {
 		panic(err)
 	}
 	defer gid.Close()
-	szr := gzip.NewReader(gid)
+	szr, err := gzip.NewReader(gid)
+	if err != nil {
+		panic(err)
+	}
 	defer szr.Close()
-	mscan := bufio.Scanner(szr)
+	mscan := bufio.NewScanner(szr)
 
 	// Place to write results
 	out, err := os.Create(path.Join(dpath, outfile))
@@ -64,30 +96,44 @@ func main() {
 	defer wtr.Close()
 
 	var done bool
-	_, sline, sfields, sseq = advance(sscan)
-	_, mline, mfields, mseq = advance(mscan)
+	var sseq, mseq string
+	var mtarget, mpos, scnt int
 
-	for {
-		c := strings.Compare(sseq, mseq)
+	_, sseq, scnt = sadvance(sscan)
+	_, mseq, mtarget, mpos = madvance(mscan)
 
+	for !done {
+
+		if len(mseq) < sw {
+			_, mseq, mtarget, mpos = madvance(mscan)
+			continue
+		}
+
+		if len(sseq) < sw {
+			_, sseq, scnt = sadvance(sscan)
+			continue
+		}
+
+		c := strings.Compare(sseq[0:sw], mseq[0:sw])
 		switch {
 		case c == 0:
-			out.Write([]byte(mfields[1]))
-			out.Write([]byte("\t"))
-			out.Write([]byte(sfields[0]))
-			out.Write([]byte("\t"))
-			out.Write([]byte(sfields[1]))
-			out.Write([]byte("\n"))
+			k := 0
+			for ; k < 120; k++ {
+				if k >= len(sseq) || k >= len(mseq) || sseq[k] != mseq[k] {
+					break
+				}
+			}
+			if k >= len(sseq) {
+				wtr.Write([]byte(fmt.Sprintf("%d\t", mtarget)))
+				wtr.Write([]byte(fmt.Sprintf("%d\t", mpos)))
+				wtr.Write([]byte(fmt.Sprintf("%d\t", scnt)))
+				wtr.Write([]byte(fmt.Sprintf("%s\n", sseq[0:k])))
+			}
+			done, mseq, mtarget, mpos = madvance(mscan)
 		case c < 0:
-			done, sline, sfields, sseq = advance(sscan)
-			if done {
-				break
-			}
+			done, sseq, scnt = sadvance(sscan)
 		case c > 0:
-			done, mline, mfields, mseq = advance(mscan)
-			if done {
-				break
-			}
+			done, mseq, mtarget, mpos = madvance(mscan)
 		}
 	}
 }
