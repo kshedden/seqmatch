@@ -11,13 +11,13 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
+
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 const (
-	// File containing sequence reads we are matching (source of
-	// matching); use the most upstream file that is practical to
-	// use.
-	sourcefile string = "PRT_NOV_15_02.txt.gz"
+	// The source sequences
+	sourcedb string = "source_seqdb"
 
 	// Candidate matching sequences
 	matchfile string = "refined_matches.txt.gz"
@@ -37,6 +37,9 @@ var (
 
 	// The sequences to check
 	checks []matchinfo
+
+	// The source database
+	sdb *leveldb.DB
 
 	// A log
 	logger *log.Logger
@@ -97,40 +100,16 @@ func readChecks() {
 // checks compares the selected candidate matches to the actual reads to confirm that they are there
 func check() {
 
-	fid, err := os.Open(path.Join(dpath, sourcefile))
-	if err != nil {
-		panic(err)
-	}
-	defer fid.Close()
-	gzr, err := gzip.NewReader(fid)
-	if err != nil {
-		panic(err)
-	}
+	var nmatch int
+	for j, ck := range checks {
 
-	scanner := bufio.NewScanner(gzr)
-	match := make([]bool, len(checks))
-	nmatch := 0
-
-	for j := 0; scanner.Scan(); j++ {
-		seq := scanner.Text()
-		if len(seq) < sw {
-			continue
+		da, err := sdb.Get([]byte(ck.seq[0:80]))
+		if err != nil {
+			panic(err)
 		}
-		for j, ck := range checks {
-			if !match[j] {
-				if ck.seq[0:sw] == seq[0:sw] {
-					match[j] = true
-					nmatch++
-				}
-			}
+		if ck.seq[0:sw] == seq[0:sw] {
+			nmatch++
 		}
-		if nmatch == ncheck {
-			break
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		panic(err)
 	}
 
 	logger.Printf("%d\n", nmatch)
@@ -155,6 +134,15 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+
+	// Open the sequence database
+	p := path.Join(dpath, sourcedb)
+	var err error
+	sdb, err = leveldb.OpenFile(p, nil)
+	if err != nil {
+		panic(err)
+	}
+	defer sdb.Close()
 
 	setupLogger()
 	readChecks()

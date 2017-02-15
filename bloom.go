@@ -164,6 +164,8 @@ func check() {
 	go func() {
 		for r := range hitchan {
 			seq := r.seq
+			// Write up to 120 values, even though only sw
+			// values are gauranteed to match.
 			if len(seq) > 120 {
 				seq = seq[0:120]
 			}

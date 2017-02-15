@@ -7,7 +7,7 @@
 #PBS -m abe
 
 # Change the number of cores (ppn=1), amount of memory, and walltime:
-#PBS -l nodes=1:ppn=2,mem=1000mb,walltime=02:00:00
+#PBS -l nodes=1:ppn=1,mem=1000mb,walltime=02:00:00
 #PBS -j oe
 #PBS -V
 
@@ -25,4 +25,4 @@ if [ -n "$PBS_NODEFILE" ]; then cat $PBS_NODEFILE; fi
 if [ -n "$PBS_O_WORKDIR" ]; then cd $PBS_O_WORKDIR; fi
 
 #  Put your job commands here:
-go run compress.go
+go run compress_source.go PRT_NOV_15_02.fastq

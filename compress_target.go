@@ -8,78 +8,17 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
-
-	"github.com/kshedden/seqmatch/utils"
 )
 
 const (
-	targetfile string = "ALL_ABFVV_Genes_Derep.txt"
-
-	sourcefile string = "PRT_NOV_15_02.fastq"
-
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
-
-	gzlevel int = 1
 )
 
 var (
 	logger *log.Logger
 )
 
-// Compress but restructure to have the same format as the target file
-// (one line per sequence).
-func source(wg *sync.WaitGroup) {
-
-	outfile := strings.Replace(sourcefile, ".fastq", ".txt.gz", -1)
-
-	inf, err := os.Open(path.Join(dpath, sourcefile))
-	if err != nil {
-		panic(err)
-	}
-	defer inf.Close()
-
-	out, err := os.Create(path.Join(dpath, outfile))
-	if err != nil {
-		panic(err)
-	}
-	defer out.Close()
-	outw, err := gzip.NewWriterLevel(out, gzlevel)
-	if err != nil {
-		panic(err)
-	}
-	defer outw.Close()
-
-	ris := utils.NewReadInSeq(sourcefile, dpath)
-
-	for lnum := 0; ris.Next(); lnum++ {
-
-		if lnum%1000000 == 0 {
-			logger.Printf("sources: %d\n", lnum)
-		}
-
-		x := []byte(ris.Seq)
-		for i, c := range x {
-			if !bytes.Contains([]byte("ATGC"), []byte{c}) {
-				x[i] = 'X'
-			}
-		}
-		_, err := outw.Write(x)
-		if err != nil {
-			panic(err)
-		}
-
-		_, err = outw.Write([]byte("\n"))
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	wg.Done()
-	logger.Printf("Done with sources")
-}
-
-func targets(wg *sync.WaitGroup) {
+func targets(targetfile string) {
 
 	outfile := targetfile + ".gz"
 
@@ -94,10 +33,7 @@ func targets(wg *sync.WaitGroup) {
 		panic(err)
 	}
 	defer out.Close()
-	outw, err := gzip.NewWriterLevel(out, gzlevel)
-	if err != nil {
-		panic(err)
-	}
+	outw := gzip.NewWriter(out)
 	defer outw.Close()
 
 	// Set up a scanner to read long lines
@@ -140,7 +76,6 @@ func targets(wg *sync.WaitGroup) {
 		}
 	}
 
-	wg.Done()
 	logger.Printf("Done with targets")
 }
 
@@ -155,13 +90,12 @@ func setupLog() {
 
 func main() {
 
-	var wg sync.WaitGroup
+	if len(os.Args) != 2 {
+		panic("wrong number of arguments\n")
+	}
+	targetfile := os.Args[1]
 
 	setupLog()
-
-	wg.Add(2)
-	go source(&wg)
-	go targets(&wg)
-	wg.Wait()
+	targets(targetfile)
 	logger.Printf("Done")
 }

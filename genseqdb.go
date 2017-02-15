@@ -2,6 +2,14 @@
 // the source sequences and one for the target sequences.  This script
 // removes any existing databases and starts from an empty database.
 //
+// For the source sequences, the key is the first `sw` (see below)
+// letters of the sequence, and the corresponding value is the
+// remaining letters, followed by a tab, followed by the weight.
+// Sequences shorter than `sw` letters are not stored.
+//
+// For the targets, the key is the gene id, and the value is the
+// sequence.
+//
 // Run the script using either "source" or "target" as an argument.
 
 package main
@@ -18,7 +26,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-var (
+const (
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
 
@@ -28,6 +36,11 @@ var (
 	// The targets (reference gene sequences)
 	targetfile string = "ALL_ABFVV_Genes_Derep_derep.txt.gz"
 
+	// Source sequences are stored based on the first sw letters.
+	sw int = 80
+)
+
+var (
 	// The dataset we are working on (source or target)
 	dset string
 
@@ -70,8 +83,10 @@ func generate(dset string) {
 
 	// Set up a scanner to read long lines
 	scanner := bufio.NewScanner(rdr)
-	sbuf := make([]byte, 1024*1024)
-	scanner.Buffer(sbuf, 1024*1024)
+	if dset == "target" {
+		sbuf := make([]byte, 1024*1024)
+		scanner.Buffer(sbuf, 1024*1024)
+	}
 
 	for lnum := 0; scanner.Scan(); lnum++ {
 
@@ -84,7 +99,13 @@ func generate(dset string) {
 		switch dset {
 		case "source":
 			toks := strings.Fields(line)
-			err := db.Put([]byte(toks[1]), []byte(toks[0]), nil)
+			seq := toks[1]
+			if len(seq) < sw {
+				continue
+			}
+			wgt := toks[0]
+			val := seq[80:len(seq)] + "\t" + wgt
+			err := db.Put([]byte(seq[0:80]), []byte(val), nil)
 			if err != nil {
 				panic(err)
 			}
