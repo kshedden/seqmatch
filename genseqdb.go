@@ -102,6 +102,25 @@ func generate(dset, infile string) {
 			if len(ky) > 100 {
 				ky = ky[0:100] + "..."
 			}
+
+			// Get a unique key
+			ky0 := ky
+			var jj int
+			for ; ; jj++ {
+				_, err := db.Get([]byte(ky0), nil)
+				if err == leveldb.ErrNotFound {
+					ky = ky0
+					break
+				} else if err != nil {
+					panic(err)
+				}
+				// Get a new key
+				ky0 = fmt.Sprintf("%s[%d]", ky, jj+1)
+			}
+			if jj == 1000 {
+				panic("Unable to find unique key")
+			}
+
 			err := db.Put([]byte(ky), []byte(toks[1]), nil)
 			if err != nil {
 				panic(err)

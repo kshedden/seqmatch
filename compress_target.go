@@ -1,3 +1,6 @@
+// Convert the target file to a simple compressed format with one
+// sequence per row.  The format of each row is: [id][tab][sequence].
+
 package main
 
 import (

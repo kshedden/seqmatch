@@ -1,3 +1,6 @@
+// Directly confirm that claimed matches in the results are actual
+// matches.
+
 package main
 
 import (
@@ -13,11 +16,15 @@ import (
 	"strings"
 
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 const (
 	// The source sequences
 	sourcedb string = "PRT_NOV_15_02_0_80_seqdb"
+
+	// The target sequences
+	targetdb string = "target_seqdb"
 
 	// Candidate matching sequences
 	matchfile string = "PRT_NOV_15_02_0_80_rmatch.txt.gz"
@@ -37,6 +44,9 @@ var (
 
 	// The source database
 	sdb *leveldb.DB
+
+	// The target database
+	tdb *leveldb.DB
 
 	// A log
 	logger *log.Logger
@@ -91,18 +101,30 @@ func readChecks() {
 	}
 }
 
-// checks compares the selected candidate matches to the actual reads to confirm that they are there
-func check() {
+// checks compares the selected candidate matches to the actual reads
+// to confirm that they are there
+func checkReads() {
 
 	var nmatch int
 	for j, ck := range checks {
 
-		da, err := sdb.Get([]byte(ck.seq), nil)
-		print(string(da), "\n")
+		_, err := sdb.Get([]byte(ck.seq), nil)
 		if err != nil {
-			print(j, " ", da, "\n")
 			panic(err)
 		}
+
+		ts, err := tdb.Get([]byte(ck.target), nil)
+		if err != nil {
+			panic(err)
+		}
+		tss := string(ts)[ck.pos : ck.pos+len(ck.seq)]
+
+		if ck.seq != tss {
+			print(j, "\n")
+			print(ck.seq, "\n")
+			print(tss, "\n\n")
+		}
+
 		nmatch++
 	}
 
@@ -129,16 +151,27 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	// Open the sequence database
+	// Open the source database
+	o := &opt.Options{
+		ReadOnly: true,
+	}
 	p := path.Join(dpath, sourcedb)
 	var err error
-	sdb, err = leveldb.OpenFile(p, nil)
+	sdb, err = leveldb.OpenFile(p, o)
 	if err != nil {
 		panic(err)
 	}
 	defer sdb.Close()
 
+	// Open the target database
+	p = path.Join(dpath, targetdb)
+	tdb, err = leveldb.OpenFile(p, o)
+	if err != nil {
+		panic(err)
+	}
+	defer tdb.Close()
+
 	setupLogger()
 	readChecks()
-	check()
+	checkReads()
 }

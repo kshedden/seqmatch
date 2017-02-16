@@ -1,3 +1,9 @@
+// Merge the sorted match results from the Bloom filter with the
+// sorted read sequence file (which also contains counts).  Doing this
+// achieves two goals: false positives from the Bloom filter are
+// eliminated, and the counts from the sequence file are incorporated
+// into the match file.
+
 package main
 
 import (
