@@ -11,19 +11,8 @@ import (
 )
 
 const (
-	// File containing sequence reads we are matching (source of matching)
-	sourcefile string = "PRT_NOV_15_02_sorted.txt.gz"
-
-	// Candidate matching sequences
-	matchfile string = "bloom_matches_sorted.txt.gz"
-
-	outfile string = "refined_matches.txt.gz"
-
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
-
-	// Merge based on this sequence length
-	sw = 80
 )
 
 func madvance(scanner *bufio.Scanner) (bool, string, string, int) {
@@ -57,6 +46,17 @@ func sadvance(scanner *bufio.Scanner) (bool, string, int) {
 
 func main() {
 
+	if len(os.Args) != 2 {
+		panic("wrong number of arguments")
+	}
+
+	sourcefile := os.Args[1]
+	if !strings.HasSuffix(sourcefile, "_sorted.txt.gz") {
+		panic("wrong input file")
+	}
+	matchfile := strings.Replace(sourcefile, "_sorted.txt.gz", "_smatch.txt.gz", -1)
+	outfile := strings.Replace(matchfile, "smatch", "rmatch", -1)
+
 	// Read source sequences
 	fid, err := os.Open(path.Join(dpath, sourcefile))
 	if err != nil {
@@ -69,6 +69,8 @@ func main() {
 	}
 	defer gzr.Close()
 	sscan := bufio.NewScanner(gzr)
+	sbuf := make([]byte, 1024*1024)
+	sscan.Buffer(sbuf, 1024*1024)
 
 	// Read candidate match sequences
 	gid, err := os.Open(path.Join(dpath, matchfile))
@@ -82,6 +84,8 @@ func main() {
 	}
 	defer szr.Close()
 	mscan := bufio.NewScanner(szr)
+	sbuf = make([]byte, 1024*1024)
+	mscan.Buffer(sbuf, 1024*1024)
 
 	// Place to write results
 	out, err := os.Create(path.Join(dpath, outfile))
@@ -100,37 +104,31 @@ func main() {
 	_, mseq, mtarget, mpos = madvance(mscan)
 
 	for !done {
-
-		if len(mseq) < sw {
-			_, mseq, mtarget, mpos = madvance(mscan)
-			continue
-		}
-
-		if len(sseq) < sw {
-			_, sseq, scnt = sadvance(sscan)
-			continue
-		}
-
-		c := strings.Compare(sseq[0:sw], mseq[0:sw])
+		c := strings.Compare(sseq, mseq)
 		switch {
 		case c == 0:
-			k := 0
-			for ; k < 120; k++ {
-				if k >= len(sseq) || k >= len(mseq) || sseq[k] != mseq[k] {
-					break
-				}
+			if len(mtarget) > 100 {
+				mtarget = mtarget[0:100] + "..."
 			}
-			if k >= len(sseq) {
-				wtr.Write([]byte(fmt.Sprintf("%d\t", mtarget)))
-				wtr.Write([]byte(fmt.Sprintf("%d\t", mpos)))
-				wtr.Write([]byte(fmt.Sprintf("%d\t", scnt)))
-				wtr.Write([]byte(fmt.Sprintf("%s\n", sseq[0:k])))
-			}
+			wtr.Write([]byte(fmt.Sprintf("%s\t", mtarget)))
+			wtr.Write([]byte(fmt.Sprintf("%d\t", mpos)))
+			wtr.Write([]byte(fmt.Sprintf("%d\t", scnt)))
+			wtr.Write([]byte(fmt.Sprintf("%s\n", sseq)))
 			done, mseq, mtarget, mpos = madvance(mscan)
 		case c < 0:
 			done, sseq, scnt = sadvance(sscan)
 		case c > 0:
 			done, mseq, mtarget, mpos = madvance(mscan)
 		}
+	}
+
+	// Check for scanning errors
+	err = mscan.Err()
+	if err != nil {
+		panic(err)
+	}
+	err = sscan.Err()
+	if err != nil {
+		panic(err)
 	}
 }

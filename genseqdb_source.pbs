@@ -12,7 +12,7 @@
 #PBS -V
 
 # Change "example_flux" to the name of your Flux allocation:
-#PBS -A lsa_flux
+#PBS -A stats_flux
 #PBS -q flux
 #PBS -l qos=flux
 
@@ -25,4 +25,4 @@ if [ -n "$PBS_NODEFILE" ]; then cat $PBS_NODEFILE; fi
 if [ -n "$PBS_O_WORKDIR" ]; then cd $PBS_O_WORKDIR; fi
 
 #  Put your job commands here:
-go run genseqdb.go source
+go run genseqdb.go source PRT_NOV_15_02_0_80_sorted.txt.gz

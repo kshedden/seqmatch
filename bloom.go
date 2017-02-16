@@ -1,3 +1,10 @@
+// Identify possible matches of a set of source sequences into a set
+// of target sequences.  The source sequences must all have the same
+// length.  The target sequences may be of variable lengths.
+//
+// The result may contain false positives, but will not have any false
+// negatives.
+
 package main
 
 import (
@@ -18,9 +25,6 @@ import (
 )
 
 const (
-	// File containing sequence reads we are matching (source of matching)
-	sourcefile string = "PRT_NOV_15_02_sorted.txt.gz"
-
 	// File containing genes we are matching into (target of matching)
 	targetfile string = "ALL_ABFVV_Genes_Derep_derep.txt.gz"
 
@@ -34,12 +38,10 @@ const (
 	// Bloom filter size in bits
 	bsize uint64 = 4 * uint64(bil)
 
-	// Search for matches based on this sequence length
-	sw int = 80
-
 	// Number of hashes to use in the Bloom filter
 	nhash int = 30
 
+	// Number of goroutines
 	concurrency int = 100
 )
 
@@ -49,11 +51,17 @@ var (
 	// A log
 	logger *log.Logger
 
+	// File containing sequence reads we are matching (source of matching)
+	sourcefile string
+
 	// The array that backs the Bloom filter
 	smp bitarray.BitArray
 
 	// Tables to produce independent running hashes
 	tables [][256]uint32
+
+	// Source sequences all have this length
+	sw int
 )
 
 func genTables() {
@@ -103,13 +111,17 @@ func buildBloom() {
 		toks := strings.Fields(line)
 		seq := toks[1]
 
-		if len(seq) < sw {
-			continue
+		if j == 0 {
+			sw = len(seq)
+		} else {
+			if len(seq) != sw {
+				panic("inconsistent sequence length")
+			}
 		}
 
 		for _, ha := range hashes {
 			ha.Reset()
-			ha.Write([]byte(seq[0:sw]))
+			ha.Write([]byte(seq))
 			x := uint64(ha.Sum32()) % bsize
 			err := smp.SetBit(x)
 			if err != nil {
@@ -152,7 +164,8 @@ func check() {
 	hitchan := make(chan rec)
 	limit := make(chan bool, concurrency)
 
-	out, err := os.Create(path.Join(dpath, "bloom_matches.txt.gz"))
+	outname := strings.Replace(sourcefile, "_sorted.txt.gz", "_bmatch.txt.gz", -1)
+	out, err := os.Create(path.Join(dpath, outname))
 	if err != nil {
 		panic(err)
 	}
@@ -163,13 +176,7 @@ func check() {
 	// Retrieve the results and write to disk
 	go func() {
 		for r := range hitchan {
-			seq := r.seq
-			// Write up to 120 values, even though only sw
-			// values are gauranteed to match.
-			if len(seq) > 120 {
-				seq = seq[0:120]
-			}
-			wtr.Write([]byte(fmt.Sprintf("%s\t", seq)))
+			wtr.Write([]byte(fmt.Sprintf("%s\t", r.seq)))
 			wtr.Write([]byte(fmt.Sprintf("%s\t", r.target)))
 			wtr.Write([]byte(fmt.Sprintf("%d\n", r.pos)))
 		}
@@ -213,7 +220,7 @@ func check() {
 			}
 			if g {
 				hitchan <- rec{
-					seq:    string(seq),
+					seq:    string(seq[0:sw]),
 					target: target,
 					pos:    0,
 				}
@@ -237,7 +244,7 @@ func check() {
 				if g {
 					// Match
 					hitchan <- rec{
-						seq:    string(seq[j-sw+1 : len(seq)]),
+						seq:    string(seq[j-sw+1 : j+1]),
 						target: target,
 						pos:    uint32(j - sw + 1),
 					}
@@ -258,7 +265,8 @@ func check() {
 }
 
 func setupLogger() {
-	logfid, err := os.Create("bloom.log")
+	logname := strings.Replace(sourcefile, ".txt.gz", "_bmatch.log", -1)
+	logfid, err := os.Create(logname)
 	if err != nil {
 		panic(err)
 	}
@@ -276,6 +284,11 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+
+	if len(os.Args) != 2 {
+		panic("wrong number of arguments")
+	}
+	sourcefile = os.Args[1]
 
 	setupLogger()
 	genTables()

@@ -1,16 +1,16 @@
 // Create two leveldb databases containing the sequence data, one for
 // the source sequences and one for the target sequences.  This script
-// removes any existing databases and starts from an empty database.
+// removes any existing database and starts from an empty database.
 //
-// For the source sequences, the key is the first `sw` (see below)
-// letters of the sequence, and the corresponding value is the
-// remaining letters, followed by a tab, followed by the weight.
-// Sequences shorter than `sw` letters are not stored.
+// For the source sequences, the key is the first sequence (which is
+// usually a subsequence of the full read), and the corresponding
+// value is the weight.
 //
 // For the targets, the key is the gene id, and the value is the
 // sequence.
 //
-// Run the script using either "source" or "target" as an argument.
+// Run the script using either "source" or "target" as an argument
+// followed by the raw file name.
 
 package main
 
@@ -29,15 +29,6 @@ import (
 const (
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
-
-	// The sources (~100bp reads)
-	sourcefile string = "PRT_NOV_15_02_sorted.txt.gz"
-
-	// The targets (reference gene sequences)
-	targetfile string = "ALL_ABFVV_Genes_Derep_derep.txt.gz"
-
-	// Source sequences are stored based on the first sw letters.
-	sw int = 80
 )
 
 var (
@@ -48,17 +39,16 @@ var (
 	logger *log.Logger
 )
 
-func generate(dset string) {
+func generate(dset, infile string) {
 
-	var infname, dbdir string
+	var dbdir string
 	if dset == "source" {
-		infname = sourcefile
-		dbdir = "source_seqdb"
+		dbdir = strings.Replace(infile, "_sorted.txt.gz", "_seqdb", -1)
 	} else if dset == "target" {
-		infname = targetfile
 		dbdir = "target_seqdb"
 	}
 
+	// Open an empty database
 	dbpath := path.Join(dpath, dbdir)
 	err := os.RemoveAll(dbpath)
 	if err != nil {
@@ -70,7 +60,8 @@ func generate(dset string) {
 	}
 	defer db.Close()
 
-	fid, err := os.Open(path.Join(dpath, infname))
+	// Open the input sequence file
+	fid, err := os.Open(path.Join(dpath, infile))
 	if err != nil {
 		panic(err)
 	}
@@ -99,19 +90,19 @@ func generate(dset string) {
 		switch dset {
 		case "source":
 			toks := strings.Fields(line)
-			seq := toks[1]
-			if len(seq) < sw {
-				continue
-			}
 			wgt := toks[0]
-			val := seq[80:len(seq)] + "\t" + wgt
-			err := db.Put([]byte(seq[0:80]), []byte(val), nil)
+			seq := toks[1]
+			err := db.Put([]byte(seq), []byte(wgt), nil)
 			if err != nil {
 				panic(err)
 			}
 		case "target":
 			toks := strings.Split(line, "\t")
-			err := db.Put([]byte(toks[0]), []byte(toks[1]), nil)
+			ky := toks[0]
+			if len(ky) > 100 {
+				ky = ky[0:100] + "..."
+			}
+			err := db.Put([]byte(ky), []byte(toks[1]), nil)
 			if err != nil {
 				panic(err)
 			}
@@ -135,20 +126,19 @@ func setupLogger(dset string) {
 
 func main() {
 
-	if len(os.Args) != 2 {
-		print("geneseqdb: argument required\n")
+	if len(os.Args) != 3 {
+		print("wrong number of arguments\n")
 	}
-
 	dset = os.Args[1]
 
 	switch dset {
 	case "source":
 		setupLogger("source")
-		generate("source")
+		generate("source", os.Args[2])
 	case "target":
 		setupLogger("target")
-		generate("target")
+		generate("target", os.Args[2])
 	default:
-		print(fmt.Sprintf("geneseqdb invalid option: %v\n", os.Args[1]))
+		panic("invalid option")
 	}
 }

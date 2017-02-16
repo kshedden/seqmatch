@@ -17,19 +17,16 @@ import (
 
 const (
 	// The source sequences
-	sourcedb string = "source_seqdb"
+	sourcedb string = "PRT_NOV_15_02_0_80_seqdb"
 
 	// Candidate matching sequences
-	matchfile string = "refined_matches.txt.gz"
+	matchfile string = "PRT_NOV_15_02_0_80_rmatch.txt.gz"
 
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
 
 	// Number of sequences to check
 	ncheck int = 100
-
-	// Check the initial subsequence with this length.
-	sw int = 80
 )
 
 var (
@@ -46,7 +43,7 @@ var (
 )
 
 type matchinfo struct {
-	target int
+	target string
 	pos    int
 	weight int
 	seq    string
@@ -72,10 +69,7 @@ func readChecks() {
 		fields := strings.Fields(line)
 		if rand.Float32() < 0.0001 {
 			var mi matchinfo
-			mi.target, err = strconv.Atoi(fields[0])
-			if err != nil {
-				panic(err)
-			}
+			mi.target = fields[0]
 			mi.pos, err = strconv.Atoi(fields[1])
 			if err != nil {
 				panic(err)
@@ -103,13 +97,13 @@ func check() {
 	var nmatch int
 	for j, ck := range checks {
 
-		da, err := sdb.Get([]byte(ck.seq[0:80]))
+		da, err := sdb.Get([]byte(ck.seq), nil)
+		print(string(da), "\n")
 		if err != nil {
+			print(j, " ", da, "\n")
 			panic(err)
 		}
-		if ck.seq[0:sw] == seq[0:sw] {
-			nmatch++
-		}
+		nmatch++
 	}
 
 	logger.Printf("%d\n", nmatch)

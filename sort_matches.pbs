@@ -26,4 +26,5 @@ if [ -n "$PBS_O_WORKDIR" ]; then cd $PBS_O_WORKDIR; fi
 
 #  Put your job commands here:
 export LC_ALL=C
-zcat /scratch/andjoh_fluxm/tealfurn/CSCAR/bloom_matches.txt.gz | sort --parallel=8 -k1 | gzip > /scratch/andjoh_fluxm/tealfurn/CSCAR/bloom_matches_sorted.txt.gz
+F="PRT_NOV_15_02_0_60"
+zcat /scratch/andjoh_fluxm/tealfurn/CSCAR/${F}_bmatch.txt.gz | sort --parallel=8 -k1 | gzip > /scratch/andjoh_fluxm/tealfurn/CSCAR/${F}_smatch.txt.gz

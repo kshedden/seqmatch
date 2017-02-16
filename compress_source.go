@@ -1,11 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"compress/gzip"
+	"fmt"
 	"log"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/kshedden/seqmatch/utils"
@@ -17,6 +18,10 @@ const (
 
 var (
 	logger *log.Logger
+
+	// Only the sequence between positions k1 and k2 is retained.
+	// Sequence with length less than k2 are skipped.
+	k1, k2 int
 )
 
 // Compress but restructure to have the same format as the target file
@@ -24,6 +29,9 @@ var (
 func source(sourcefile string) {
 
 	outfile := strings.Replace(sourcefile, ".fastq", ".txt.gz", -1)
+
+	s := fmt.Sprintf("_%d_%d", k1, k2)
+	outfile = strings.Replace(outfile, ".txt.gz", s+".txt.gz", -1)
 
 	inf, err := os.Open(path.Join(dpath, sourcefile))
 	if err != nil {
@@ -47,9 +55,22 @@ func source(sourcefile string) {
 			logger.Printf("sources: %d\n", lnum)
 		}
 
-		x := []byte(ris.Seq)
+		if len(ris.Seq) < k2 {
+			continue
+		}
+
+		x := []byte(ris.Seq[k1:k2])
 		for i, c := range x {
-			if !bytes.Contains([]byte("ATGC"), []byte{c}) {
+			switch c {
+			case 'A':
+				// pass
+			case 'T':
+				// pass
+			case 'C':
+				// pass
+			case 'G':
+				// pass
+			default:
 				x[i] = 'X'
 			}
 		}
@@ -77,10 +98,20 @@ func setupLog() {
 
 func main() {
 
-	if len(os.Args) != 2 {
+	if len(os.Args) != 4 {
 		panic("wrong number of arguments\n")
 	}
 	sourcefile := os.Args[1]
+
+	var err error
+	k1, err = strconv.Atoi(os.Args[2])
+	if err != nil {
+		panic(err)
+	}
+	k2, err = strconv.Atoi(os.Args[3])
+	if err != nil {
+		panic(err)
+	}
 
 	setupLog()
 	source(sourcefile)

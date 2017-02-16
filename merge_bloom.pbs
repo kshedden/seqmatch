@@ -25,4 +25,4 @@ if [ -n "$PBS_NODEFILE" ]; then cat $PBS_NODEFILE; fi
 if [ -n "$PBS_O_WORKDIR" ]; then cd $PBS_O_WORKDIR; fi
 
 #  Put your job commands here:
-go run merge_bloom.go
+go run merge_bloom.go PRT_NOV_15_02_0_80_sorted.txt.gz
