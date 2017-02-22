@@ -5,14 +5,12 @@
 package main
 
 import (
-	"compress/gzip"
-	"fmt"
 	"log"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 
+	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
 )
 
@@ -22,21 +20,13 @@ const (
 
 var (
 	logger *log.Logger
-
-	// Only the sequence between positions k1 and k2 is retained.
-	// Sequence with length less than k2 are skipped.
-	k1, k2 int
 )
 
 // Compress but restructure to have the same format as the target file
 // (one line per sequence).
 func source(sourcefile string) {
 
-	outfile := strings.Replace(sourcefile, ".fastq", ".txt.gz", -1)
-
-	s := fmt.Sprintf("_%d_%d", k1, k2)
-	outfile = strings.Replace(outfile, ".txt.gz", s+".txt.gz", -1)
-
+	outfile := strings.Replace(sourcefile, ".fastq", ".txt.sz", -1)
 	inf, err := os.Open(path.Join(dpath, sourcefile))
 	if err != nil {
 		panic(err)
@@ -48,7 +38,7 @@ func source(sourcefile string) {
 		panic(err)
 	}
 	defer out.Close()
-	outw := gzip.NewWriter(out)
+	outw := snappy.NewBufferedWriter(out)
 	defer outw.Close()
 
 	ris := utils.NewReadInSeq(sourcefile, dpath)
@@ -59,26 +49,28 @@ func source(sourcefile string) {
 			logger.Printf("sources: %d\n", lnum)
 		}
 
-		if len(ris.Seq) < k2 {
-			continue
-		}
-
-		x := []byte(ris.Seq[k1:k2])
-		for i, c := range x {
+		var na, nt int
+		xseq := []byte(ris.Seq)
+		for i, c := range xseq {
 			switch c {
 			case 'A':
-				// pass
+				na++
 			case 'T':
-				// pass
+				nt++
 			case 'C':
 				// pass
 			case 'G':
 				// pass
 			default:
-				x[i] = 'X'
+				xseq[i] = 'X'
 			}
 		}
-		_, err := outw.Write(x)
+
+		if na > len(xseq)-5 || nt > len(xseq)-5 {
+			continue
+		}
+
+		_, err := outw.Write(xseq)
 		if err != nil {
 			panic(err)
 		}
@@ -102,20 +94,10 @@ func setupLog() {
 
 func main() {
 
-	if len(os.Args) != 4 {
+	if len(os.Args) != 2 {
 		panic("wrong number of arguments\n")
 	}
 	sourcefile := os.Args[1]
-
-	var err error
-	k1, err = strconv.Atoi(os.Args[2])
-	if err != nil {
-		panic(err)
-	}
-	k2, err = strconv.Atoi(os.Args[3])
-	if err != nil {
-		panic(err)
-	}
 
 	setupLog()
 	source(sourcefile)

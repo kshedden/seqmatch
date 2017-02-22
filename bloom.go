@@ -9,7 +9,6 @@ package main
 
 import (
 	"bufio"
-	"compress/gzip"
 	"flag"
 	"fmt"
 	"log"
@@ -17,16 +16,18 @@ import (
 	"os"
 	"path"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 
 	"github.com/chmduquesne/rollinghash"
 	"github.com/chmduquesne/rollinghash/buzhash"
 	"github.com/golang-collections/go-datastructures/bitarray"
+	"github.com/golang/snappy"
 )
 
 const (
 	// File containing genes we are matching into (target of matching)
-	targetfile string = "ALL_ABFVV_Genes_Derep_derep.txt.gz"
+	targetfile string = "ALL_ABFVV_Genes_Derep_tr.txt.sz"
 
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
@@ -60,8 +61,11 @@ var (
 	// Tables to produce independent running hashes
 	tables [][256]uint32
 
-	// Source sequences all have this length
-	sw int
+	// The hash is computed from this subinterval
+	hp1, hp2 int
+
+	// The length of the hash window
+	hlen int
 )
 
 func genTables() {
@@ -88,13 +92,9 @@ func buildBloom() {
 		panic(err)
 	}
 	defer fid.Close()
-	gzr, err := gzip.NewReader(fid)
-	if err != nil {
-		panic(err)
-	}
-	defer gzr.Close()
+	snr := snappy.NewReader(fid)
 
-	scanner := bufio.NewScanner(gzr)
+	scanner := bufio.NewScanner(snr)
 
 	hashes := make([]rollinghash.Hash32, nhash)
 	for j, _ := range hashes {
@@ -109,15 +109,7 @@ func buildBloom() {
 
 		line := scanner.Text()
 		toks := strings.Fields(line)
-		seq := toks[1]
-
-		if j == 0 {
-			sw = len(seq)
-		} else {
-			if len(seq) != sw {
-				panic("inconsistent sequence length")
-			}
-		}
+		seq := toks[0]
 
 		for _, ha := range hashes {
 			ha.Reset()
@@ -138,46 +130,46 @@ func buildBloom() {
 }
 
 type rec struct {
-	seq    string
-	target string
-	pos    uint32
+	mseq  string
+	left  string
+	right string
+	tname string
+	pos   uint32
 }
 
-func check() {
+func search() {
 
 	fid, err := os.Open(path.Join(dpath, targetfile))
 	if err != nil {
 		panic(err)
 	}
 	defer fid.Close()
-	gzr, err := gzip.NewReader(fid)
-	if err != nil {
-		panic(err)
-	}
-	defer gzr.Close()
+	snr := snappy.NewReader(fid)
 
 	// Target file contains some very long lines
-	scanner := bufio.NewScanner(gzr)
+	scanner := bufio.NewScanner(snr)
 	sbuf := make([]byte, 1024*1024)
 	scanner.Buffer(sbuf, 1024*1024)
 
 	hitchan := make(chan rec)
 	limit := make(chan bool, concurrency)
 
-	outname := strings.Replace(sourcefile, "_sorted.txt.gz", "_bmatch.txt.gz", -1)
+	outname := strings.Replace(sourcefile, "_sorted.txt.sz", "_bmatch.txt.sz", -1)
 	out, err := os.Create(path.Join(dpath, outname))
 	if err != nil {
 		panic(err)
 	}
 	defer out.Close()
-	wtr := gzip.NewWriter(out)
+	wtr := snappy.NewBufferedWriter(out)
 	defer wtr.Close()
 
 	// Retrieve the results and write to disk
 	go func() {
 		for r := range hitchan {
-			wtr.Write([]byte(fmt.Sprintf("%s\t", r.seq)))
-			wtr.Write([]byte(fmt.Sprintf("%s\t", r.target)))
+			wtr.Write([]byte(fmt.Sprintf("%s\t", r.mseq)))
+			wtr.Write([]byte(fmt.Sprintf("%s\t", r.left)))
+			wtr.Write([]byte(fmt.Sprintf("%s\t", r.right)))
+			wtr.Write([]byte(fmt.Sprintf("%s\t", r.tname)))
 			wtr.Write([]byte(fmt.Sprintf("%d\n", r.pos)))
 		}
 	}()
@@ -190,19 +182,19 @@ func check() {
 
 		line := scanner.Text()
 		toks := strings.Split(line, "\t")
-		tname := toks[0]
-		seq := toks[1]
+		tname := toks[1]
+		seq := toks[0]
 
-		if len(seq) < sw {
+		if len(seq) < hlen {
 			continue
 		}
 
 		limit <- true
-		go func(seq []byte, target string) {
+		go func(seq []byte, tname string) {
 			hashes := make([]rollinghash.Hash32, nhash)
 			for j, _ := range hashes {
 				hashes[j] = buzhash.NewFromByteArray(tables[j])
-				hashes[j].Write(seq[0:sw])
+				hashes[j].Write(seq[0:hlen])
 			}
 
 			// Check the initial window
@@ -218,16 +210,22 @@ func check() {
 					break
 				}
 			}
-			if g {
+			if g && hp1 == 0 {
+				jz := 100 - hp2
+				if jz > len(seq) {
+					jz = len(seq)
+				}
 				hitchan <- rec{
-					seq:    string(seq[0:sw]),
-					target: target,
-					pos:    0,
+					mseq:  string(seq[0:hlen]),
+					left:  "",
+					right: string(seq[hlen:jz]),
+					tname: tname,
+					pos:   0,
 				}
 			}
 
 			// Check the rest of the windows
-			for j := sw; j < len(seq); j++ {
+			for j := hlen; j < len(seq); j++ {
 				g := true
 				for _, ha := range hashes {
 					ha.Roll(seq[j])
@@ -241,12 +239,31 @@ func check() {
 						g = g && f
 					}
 				}
-				if g {
-					// Match
+
+				// Process a match
+				if g && j >= hp2-1 {
+					// Matching sequence is jx:jy
+					jx := j - hlen + 1
+					jy := j + 1
+
+					// Left tail is jw:jx
+					jw := jx - hp1
+					if jw < 0 {
+						jw = 0
+					}
+
+					// Right tail is jy:jz
+					jz := jy + 100 - hp2
+					if jz > len(seq) {
+						jz = len(seq)
+					}
+
 					hitchan <- rec{
-						seq:    string(seq[j-sw+1 : j+1]),
-						target: target,
-						pos:    uint32(j - sw + 1),
+						mseq:  string(seq[jx:jy]),
+						left:  string(seq[jw:jx]),
+						right: string(seq[jy:jz]),
+						tname: tname,
+						pos:   uint32(j - hlen + 1),
 					}
 				}
 			}
@@ -265,7 +282,7 @@ func check() {
 }
 
 func setupLogger() {
-	logname := strings.Replace(sourcefile, ".txt.gz", "_bmatch.log", -1)
+	logname := strings.Replace(sourcefile, ".txt.sz", "_bmatch.log", -1)
 	logfid, err := os.Create(logname)
 	if err != nil {
 		panic(err)
@@ -285,10 +302,20 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	if len(os.Args) != 2 {
+	if len(os.Args) != 4 {
 		panic("wrong number of arguments")
 	}
 	sourcefile = os.Args[1]
+	var err error
+	hp1, err = strconv.Atoi(os.Args[2])
+	if err != nil {
+		panic(err)
+	}
+	hp2, err = strconv.Atoi(os.Args[3])
+	if err != nil {
+		panic(err)
+	}
+	hlen = hp2 - hp1
 
 	setupLogger()
 	genTables()
@@ -296,5 +323,5 @@ func main() {
 	smp = bitarray.NewBitArray(bsize)
 
 	buildBloom()
-	check()
+	search()
 }

@@ -8,12 +8,14 @@ package main
 
 import (
 	"bufio"
-	"compress/gzip"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path"
-	"strconv"
 	"strings"
+
+	"github.com/golang/snappy"
 )
 
 const (
@@ -21,33 +23,95 @@ const (
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
 )
 
-func madvance(scanner *bufio.Scanner) (bool, string, string, int) {
-	if !scanner.Scan() {
-		return true, "", "", -1
-	}
-	line := scanner.Text()
-	fields := strings.Fields(line)
-	seq := fields[0]
-	target := fields[1]
-	pos, err := strconv.Atoi(fields[2])
-	if err != nil {
-		panic(err)
-	}
-	return false, seq, target, pos
+var (
+	logger *log.Logger
+)
+
+type breader struct {
+	scanner *bufio.Scanner
+	chunk   [][]string
+	stash   []string
+	done    bool
+	lnum    int
+	name    string
 }
 
-func sadvance(scanner *bufio.Scanner) (bool, string, int) {
-	if !scanner.Scan() {
-		return true, "", -1
+func (b *breader) Next() bool {
+
+	if b.done {
+		return false
 	}
-	line := scanner.Text()
-	fields := strings.Fields(line)
-	seq := fields[1]
-	cnt, err := strconv.Atoi(fields[0])
+
+	b.chunk = b.chunk[0:0]
+	if b.stash != nil {
+		b.chunk = append(b.chunk, b.stash)
+		b.stash = nil
+	}
+
+	for {
+		f := b.scanner.Scan()
+		if err := b.scanner.Err(); err != nil {
+			panic(err)
+		}
+		b.lnum++
+		if b.lnum%100000 == 0 {
+			logger.Printf("%s: %d\n", b.name, b.lnum)
+		}
+
+		if !f {
+			b.done = true
+			logger.Printf("%s done\n", b.name)
+			return true
+		}
+
+		line := b.scanner.Text()
+		fields := strings.Split(line, "\t")
+
+		if (b.chunk != nil) && (fields[0] != b.chunk[0][0]) {
+			b.stash = fields
+			return true
+		}
+		b.chunk = append(b.chunk, fields)
+	}
+}
+
+func searchpairs(source, match *breader, wtr io.Writer) {
+
+	for _, schunk := range source.chunk {
+		for _, mchunk := range match.chunk {
+
+			stag := schunk[0]
+			slft := schunk[1]
+			srgt := schunk[2]
+			scnt := schunk[3]
+			//mtag := mchunk[0]
+			mlft := mchunk[1]
+			mrgt := mchunk[2]
+			mgene := mchunk[3]
+			mpos := mchunk[4]
+
+			if len(srgt) > len(mrgt) {
+				continue
+			}
+			m := len(srgt)
+			if mlft != slft || mrgt[0:m] != srgt[0:m] {
+				continue
+			}
+
+			wtr.Write([]byte(fmt.Sprintf("%s\t", slft+stag+srgt)))
+			wtr.Write([]byte(fmt.Sprintf("%s\t", mpos)))
+			wtr.Write([]byte(fmt.Sprintf("%s\t", scnt)))
+			wtr.Write([]byte(fmt.Sprintf("%s\n", mgene)))
+		}
+	}
+}
+
+func setupLog() {
+	fid, err := os.Create("merge_bloom.log")
 	if err != nil {
 		panic(err)
 	}
-	return false, seq, cnt
+	logger = log.New(fid, "", log.Lshortfile)
 }
 
 func main() {
@@ -55,28 +119,25 @@ func main() {
 	if len(os.Args) != 2 {
 		panic("wrong number of arguments")
 	}
+	setupLog()
 
 	sourcefile := os.Args[1]
-	if !strings.HasSuffix(sourcefile, "_sorted.txt.gz") {
-		panic("wrong input file")
-	}
-	matchfile := strings.Replace(sourcefile, "_sorted.txt.gz", "_smatch.txt.gz", -1)
+	matchfile := strings.Replace(sourcefile, "_sorted.txt.sz", "_smatch.txt.sz", -1)
 	outfile := strings.Replace(matchfile, "smatch", "rmatch", -1)
+	outfile = strings.Replace(outfile, ".sz", "", -1)
 
 	// Read source sequences
-	fid, err := os.Open(path.Join(dpath, sourcefile))
+	fn := path.Join(dpath, sourcefile)
+	fid, err := os.Open(fn)
 	if err != nil {
 		panic(err)
 	}
 	defer fid.Close()
-	gzr, err := gzip.NewReader(fid)
-	if err != nil {
-		panic(err)
-	}
-	defer gzr.Close()
-	sscan := bufio.NewScanner(gzr)
+	szr := snappy.NewReader(fid)
+	sscan := bufio.NewScanner(szr)
 	sbuf := make([]byte, 1024*1024)
 	sscan.Buffer(sbuf, 1024*1024)
+	source := &breader{scanner: sscan, name: "source"}
 
 	// Read candidate match sequences
 	gid, err := os.Open(path.Join(dpath, matchfile))
@@ -84,14 +145,11 @@ func main() {
 		panic(err)
 	}
 	defer gid.Close()
-	szr, err := gzip.NewReader(gid)
-	if err != nil {
-		panic(err)
-	}
-	defer szr.Close()
-	mscan := bufio.NewScanner(szr)
+	szq := snappy.NewReader(gid)
+	mscan := bufio.NewScanner(szq)
 	sbuf = make([]byte, 1024*1024)
 	mscan.Buffer(sbuf, 1024*1024)
+	match := &breader{scanner: mscan, name: "match"}
 
 	// Place to write results
 	out, err := os.Create(path.Join(dpath, outfile))
@@ -99,42 +157,33 @@ func main() {
 		panic(err)
 	}
 	defer out.Close()
-	wtr := gzip.NewWriter(out)
-	defer wtr.Close()
 
-	var done bool
-	var sseq, mseq, mtarget string
-	var mpos, scnt int
+	source.Next()
+	match.Next()
 
-	_, sseq, scnt = sadvance(sscan)
-	_, mseq, mtarget, mpos = madvance(mscan)
-
-	for !done {
-		c := strings.Compare(sseq, mseq)
+lp:
+	for {
+		s := source.chunk[0][0]
+		m := match.chunk[0][0]
+		c := strings.Compare(s, m)
 		switch {
 		case c == 0:
-			if len(mtarget) > 100 {
-				mtarget = mtarget[0:100] + "..."
+			searchpairs(source, match, out)
+			ms := source.Next()
+			mb := match.Next()
+			if !(ms && mb) {
+				break lp
 			}
-			wtr.Write([]byte(fmt.Sprintf("%s\t", mtarget)))
-			wtr.Write([]byte(fmt.Sprintf("%d\t", mpos)))
-			wtr.Write([]byte(fmt.Sprintf("%d\t", scnt)))
-			wtr.Write([]byte(fmt.Sprintf("%s\n", sseq)))
-			done, mseq, mtarget, mpos = madvance(mscan)
 		case c < 0:
-			done, sseq, scnt = sadvance(sscan)
+			ms := source.Next()
+			if !ms {
+				break lp
+			}
 		case c > 0:
-			done, mseq, mtarget, mpos = madvance(mscan)
+			mb := match.Next()
+			if !mb {
+				break lp
+			}
 		}
-	}
-
-	// Check for scanning errors
-	err = mscan.Err()
-	if err != nil {
-		panic(err)
-	}
-	err = sscan.Err()
-	if err != nil {
-		panic(err)
 	}
 }
