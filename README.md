@@ -1,33 +1,24 @@
 Outline of strategy:
 
-1. Run `compress.go` to convert the raw sequence and target files to
-gzip compressed files.  In these files, one sequence is placed on each
-line, with the structure: sequence id/tab/sequence/newline.  Sequence
-elements other than A/T/G/C are converted to X.
+1. Restructure the targets so that all letters other than A/T/G/C are
+converted to X, and the file has one line per sequence with format
+sequence/newline/identifier.
 
-2. Run `sort_sources.pbs` and `sort_targets.pbs` to sort and
-de-duplicate the sequences.  The count information is retained for the
-sources but not for the targets.
+2. Sort and deduplicate the reads, then compress them and write them
+to a file with format: sequence/count/newline.  The count is the
+number of times eah distinct read occurs in the original raw read
+pool.  Then compress and restructure the file to have one line per
+gene, with format: sequence/tab/identifier. Sequence elements other
+than A/T/G/C are converted to X.
 
-3. Run `bloom.go` to identify candidate matches.
+3. Create a windowed read file with structure: tag/tab/read
+sequence/tab/count/newline.  The tag is a subsequence of the full read
+beginning and ending at defined locations.
 
-4. Run `sort_matches.pbs` to sort the matches
+4. Run `bloom.go` to identify candidate matches based on the windowed
+reads.
 
-5. Run `merge_matches.go` to merge the matches with the source file.
-This step eliminates false positives from the Bloom filter.
+5. Sort the candidate matches from step 4.
 
-
-Notes:
-
-* The `sw` parameter sets the sequence width.  It should be set to the
-  same value in all files.  Reads shorter than this width are skipped.
-  Reads that are `sw` or longer in length are only matched based on
-  the first `sw` values.
-
-* The output file gives all subsequences from the target genes that
-  match the source sequences (truncated to length `sw` as noted
-  above).  Each target gene may match multiple source sequences, and
-  these source sequences may have weights greater than 1 based on the
-  source deduplication (step 2 above).  To infer an expression level
-  we should add the weights over all source sequences that match into
-  a given target gene.
+6. Use a merging procedure to exclude candidate matches that are not
+truly matches.
