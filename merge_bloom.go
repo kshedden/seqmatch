@@ -13,6 +13,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/golang/snappy"
@@ -98,8 +99,13 @@ func searchpairs(source, match *breader, wtr io.Writer) {
 				continue
 			}
 
+			mposi, err := strconv.Atoi(mpos)
+			if err != nil {
+				panic(err)
+			}
+
 			wtr.Write([]byte(fmt.Sprintf("%s\t", slft+stag+srgt)))
-			wtr.Write([]byte(fmt.Sprintf("%s\t", mpos)))
+			wtr.Write([]byte(fmt.Sprintf("%d\t", mposi-len(mlft))))
 			wtr.Write([]byte(fmt.Sprintf("%s\t", scnt)))
 			wtr.Write([]byte(fmt.Sprintf("%s\n", mgene)))
 		}
