@@ -32,9 +32,11 @@ D="/scratch/andjoh_fluxm/tealfurn/CSCAR/"
 H="PRT_NOV_15_02"
 F1="20"
 F2="60"
+NX="5"
 sztool -d ${D}${H}.txt.sz | sort --parallel=8 | uniq -c | sztool -c - ${D}${H}_sorted.txt.sz
 go run window_reads.go ${H}_sorted.txt.sz ${F1} ${F2}
 sztool -d ${D}${H}_win_${F1}_${F2}.txt.sz | sort --parallel=8 -k1 | sztool -c - ${D}${H}_win_${F1}_${F2}_sorted.txt.sz
 go run bloom.go ${H}_win_${F1}_${F2}_sorted.txt.sz ${F1} ${F2}
 sztool -d ${D}${H}_win_${F1}_${F2}_bmatch.txt.sz | sort --parallel=8 -k1 | sztool -c - ${D}${H}_win_${F1}_${F2}_smatch.txt.sz
-go run merge_bloom.go ${H}_win_${F1}_${F2}_sorted.txt.sz
+go run merge_bloom.go ${H}_win_${F1}_${F2}_sorted.txt.sz ${NX}
+sort ${D}${H}_win_${F1}_${F2}_${NX}_rmatch.txt > tt && mv tt ${D}${H}_win_${F1}_${F2}_${NX}_rmatch.txt

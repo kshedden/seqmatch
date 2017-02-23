@@ -191,13 +191,26 @@ func search() {
 
 		limit <- true
 		go func(seq []byte, tname string) {
+
+			// Count A and T
+			var na, nt int
+			for _, x := range seq[0:hlen] {
+				switch x {
+				case 'A':
+					na++
+				case 'T':
+					nt++
+				}
+			}
+
+			// Initialize the hashes
 			hashes := make([]rollinghash.Hash32, nhash)
 			for j, _ := range hashes {
 				hashes[j] = buzhash.NewFromByteArray(tables[j])
 				hashes[j].Write(seq[0:hlen])
 			}
 
-			// Check the initial window
+			// Check if the initial window is a match
 			g := true
 			for _, ha := range hashes {
 				x := uint64(ha.Sum32()) % bsize
@@ -210,7 +223,7 @@ func search() {
 					break
 				}
 			}
-			if g && hp1 == 0 {
+			if g && hp1 == 0 && na < hlen-5 && nt < hlen-5 {
 				jz := 100 - hp2
 				if jz > len(seq) {
 					jz = len(seq)
@@ -226,6 +239,22 @@ func search() {
 
 			// Check the rest of the windows
 			for j := hlen; j < len(seq); j++ {
+
+				// Update the A/T counts
+				switch seq[j] {
+				case 'T':
+					nt++
+				case 'A':
+					na++
+				}
+				switch seq[j-hlen] {
+				case 'T':
+					nt--
+				case 'A':
+					na--
+				}
+
+				// Check for a match
 				g := true
 				for _, ha := range hashes {
 					ha.Roll(seq[j])
@@ -241,7 +270,7 @@ func search() {
 				}
 
 				// Process a match
-				if g && j >= hp2-1 {
+				if g && j >= hp2-1 && na < hlen-5 && nt < hlen-5 {
 					// Matching sequence is jx:jy
 					jx := j - hlen + 1
 					jy := j + 1
