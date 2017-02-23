@@ -270,6 +270,7 @@ func search() {
 				}
 
 				// Process a match
+				// TODO constants should be configurable
 				if g && j >= hp2-1 && na < hlen-5 && nt < hlen-5 {
 					// Matching sequence is jx:jy
 					jx := j - hlen + 1

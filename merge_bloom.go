@@ -80,6 +80,8 @@ func (b *breader) Next() bool {
 
 		if (b.chunk != nil) && (fields[0] != b.chunk[0][0]) {
 			b.stash = fields
+
+			// Check sorting
 			if b.haslast {
 				if b.last > b.chunk[0][0] {
 					panic("file is not sorted")
@@ -87,12 +89,14 @@ func (b *breader) Next() bool {
 			}
 			b.last = b.chunk[0][0]
 			b.haslast = true
+
 			return true
 		}
 		b.chunk = append(b.chunk, fields)
 	}
 }
 
+// cdiff returns the number of unequal values in two byte sequences
 func cdiff(x, y []byte) int {
 	var c int
 	for i, v := range x {
@@ -125,6 +129,7 @@ func searchpairs(source, match [][]string, sem chan bool) {
 				continue
 			}
 
+			// Count differences
 			m := len(srgt)
 			nx := cdiff([]byte(mlft), []byte(slft))
 			nx += cdiff([]byte(mrgt[0:m]), []byte(srgt[0:m]))

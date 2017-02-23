@@ -22,6 +22,7 @@ import (
 )
 
 const (
+	// TODO this should be configurable
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
 )
 

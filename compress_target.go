@@ -1,5 +1,6 @@
-// Convert the target file to a simple compressed format with one
-// sequence per row.  The format of each row is: [id][tab][sequence].
+// Convert the gene sequence file to a simple compressed format with
+// one sequence per row.  The format of each row is:
+// sequence<tab>identifier.
 
 package main
 
@@ -16,6 +17,7 @@ import (
 )
 
 const (
+	// TODO make this configurable
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
 )
 
@@ -43,7 +45,7 @@ func targets(targetfile string) {
 	outw := snappy.NewBufferedWriter(out)
 	defer outw.Close()
 
-	// Set up a scanner to read long lines
+	// Setup a scanner to read long lines
 	scanner := bufio.NewScanner(inf)
 	sbuf := make([]byte, 1024*1024)
 	scanner.Buffer(sbuf, 1024*1024)

@@ -1,6 +1,5 @@
-// Convert a source file from fastq to a simple compressed format with
-// one sequence per row.  The format of each row is:
-// [id][tab][sequence].
+// Convert a source file of sequencing reads from fastq format to a
+// simple compressed format with one sequence per row.
 
 package main
 
@@ -15,6 +14,7 @@ import (
 )
 
 const (
+	// TODO: make this configurable
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
 )
 
@@ -22,8 +22,6 @@ var (
 	logger *log.Logger
 )
 
-// Compress but restructure to have the same format as the target file
-// (one line per sequence).
 func source(sourcefile string) {
 
 	outfile := strings.Replace(sourcefile, ".fastq", ".txt.sz", -1)
@@ -66,6 +64,8 @@ func source(sourcefile string) {
 			}
 		}
 
+		// Drop if poly-A or poly-T TODO: the constant should
+		// be configurable
 		if na > len(xseq)-5 || nt > len(xseq)-5 {
 			continue
 		}
