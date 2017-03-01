@@ -7,7 +7,7 @@
 #PBS -m abe
 
 # Change the number of cores (ppn=1), amount of memory, and walltime:
-#PBS -l nodes=1:ppn=10,mem=2000mb,walltime=5:00:00
+#PBS -l nodes=1:ppn=16,mem=62gb,walltime=5:00:00
 #PBS -j oe
 #PBS -V
 
@@ -30,13 +30,15 @@ export GOPATH=/home/kshedden/go_projects
 export PATH=$PATH:/home/kshedden/go_projects/bin
 D="/scratch/andjoh_fluxm/tealfurn/CSCAR/"
 H="PRT_NOV_15_02"
-F1="20"
+F1="30"
 F2="60"
-NX="5"
-sztool -d ${D}${H}.txt.sz | sort --parallel=8 | uniq -c | sztool -c - ${D}${H}_sorted.txt.sz
+NX="10"
+CSORT="sort -S 800M --parallel=8"
+go run compress_source.go ${H}.fastq
+sztool -d ${D}${H}.txt.sz | ${CSORT} | uniq -c | sztool -c - ${D}${H}_sorted.txt.sz
 go run window_reads.go ${H}_sorted.txt.sz ${F1} ${F2}
-sztool -d ${D}${H}_win_${F1}_${F2}.txt.sz | sort --parallel=8 -k1 | sztool -c - ${D}${H}_win_${F1}_${F2}_sorted.txt.sz
+sztool -d ${D}${H}_win_${F1}_${F2}.txt.sz | ${CSORT} -k1 | sztool -c - ${D}${H}_win_${F1}_${F2}_sorted.txt.sz
 go run bloom.go ${H}_win_${F1}_${F2}_sorted.txt.sz ${F1} ${F2}
-sztool -d ${D}${H}_win_${F1}_${F2}_bmatch.txt.sz | sort --parallel=8 -k1 | sztool -c - ${D}${H}_win_${F1}_${F2}_smatch.txt.sz
+sztool -d ${D}${H}_win_${F1}_${F2}_bmatch.txt.sz | ${CSORT} -k1 | sztool -c - ${D}${H}_win_${F1}_${F2}_smatch.txt.sz
 go run merge_bloom.go ${H}_win_${F1}_${F2}_sorted.txt.sz ${NX}
-sort ${D}${H}_win_${F1}_${F2}_${NX}_rmatch.txt > tt && mv tt ${D}${H}_win_${F1}_${F2}_${NX}_rmatch.txt
+${CSORT} -o ${D}${H}_win_${F1}_${F2}_${NX}_rmatch.txt ${D}${H}_win_${F1}_${F2}_${NX}_rmatch.txt

@@ -9,6 +9,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -133,7 +134,7 @@ type rec struct {
 	mseq  string
 	left  string
 	right string
-	tname string
+	tnum  int
 	pos   uint32
 }
 
@@ -165,12 +166,31 @@ func search() {
 
 	// Retrieve the results and write to disk
 	go func() {
+
+		lw := 150
+		bb := bytes.Repeat([]byte(" "), 150)
+		bb[lw-1] = byte('\n')
+
 		for r := range hitchan {
-			wtr.Write([]byte(fmt.Sprintf("%s\t", r.mseq)))
-			wtr.Write([]byte(fmt.Sprintf("%s\t", r.left)))
-			wtr.Write([]byte(fmt.Sprintf("%s\t", r.right)))
-			wtr.Write([]byte(fmt.Sprintf("%s\t", r.tname)))
-			wtr.Write([]byte(fmt.Sprintf("%d\n", r.pos)))
+			n1, err1 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.mseq)))
+			n2, err2 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.left)))
+			n3, err3 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.right)))
+			n4, err4 := wtr.Write([]byte(fmt.Sprintf("%d\t", r.tnum)))
+			n5, err5 := wtr.Write([]byte(fmt.Sprintf("%d", r.pos)))
+
+			if err1 != nil || err2 != nil || err3 != nil || err4 != nil || err5 != nil {
+				panic("writing error")
+			}
+
+			n := n1 + n2 + n3 + n4 + n5
+			if n > lw {
+				panic("output line is too long")
+			}
+
+			_, err := wtr.Write(bb[n:lw])
+			if err != nil {
+				panic(err)
+			}
 		}
 	}()
 
@@ -232,7 +252,7 @@ func search() {
 					mseq:  string(seq[0:hlen]),
 					left:  "",
 					right: string(seq[hlen:jz]),
-					tname: tname,
+					tnum:  i,
 					pos:   0,
 				}
 			}
@@ -292,7 +312,7 @@ func search() {
 						mseq:  string(seq[jx:jy]),
 						left:  string(seq[jw:jx]),
 						right: string(seq[jy:jz]),
-						tname: tname,
+						tnum:  i,
 						pos:   uint32(j - hlen + 1),
 					}
 				}

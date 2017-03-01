@@ -7,12 +7,12 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -29,18 +29,21 @@ const (
 var (
 	logger *log.Logger
 
+	pool chan []byte
+
 	nmiss int
 
 	rsltChan chan string
 )
 
 type breader struct {
-	scanner *bufio.Scanner
-	chunk   [][]string
-	stash   []string
-	done    bool
-	lnum    int
-	name    string
+	reader io.Reader
+	bufs   [][]byte
+	chunk  [][][]byte
+	stash  []byte
+	done   bool
+	lnum   int
+	name   string
 
 	// Used to confirm that file is sorted
 	last    string
@@ -53,41 +56,65 @@ func (b *breader) Next() bool {
 		return false
 	}
 
+	// Start with an empty backing collection
+	for _, b := range b.bufs {
+		pool <- b
+	}
+	b.bufs = b.bufs[0:0]
 	b.chunk = b.chunk[0:0]
+
 	if b.stash != nil {
-		b.chunk = append(b.chunk, b.stash)
+		b.chunk = append(b.chunk, bytes.Split(b.stash, []byte("\t")))
 		b.stash = nil
 	}
 
-	for {
-		f := b.scanner.Scan()
-		if err := b.scanner.Err(); err != nil {
-			panic(err)
-		}
-		b.lnum++
-		if b.lnum%100000 == 0 {
-			logger.Printf("%s: %d\n", b.name, b.lnum)
+	lw := 150
+	var fseq []byte
+
+	for ii := 0; ; ii++ {
+		var buf []byte
+		select {
+		case buf = <-pool:
+		default:
+			buf = make([]byte, lw)
 		}
 
-		if !f {
+		n, err := b.reader.Read(buf)
+		if err == io.EOF {
 			b.done = true
 			logger.Printf("%s done\n", b.name)
 			return true
+		} else if err != nil {
+			panic(err)
+		}
+		if n != lw {
+			panic("short line")
+		}
+		b.bufs = append(b.bufs, buf)
+
+		b.lnum++
+		if b.lnum%100000 == 0 {
+			logger.Printf("%s: %d %d %d\n", b.name, b.lnum, cap(b.chunk), len(b.chunk))
 		}
 
-		line := b.scanner.Text()
-		fields := strings.Split(line, "\t")
+		fields := bytes.Split(buf, []byte("\t"))
+		if ii == 0 {
+			fseq = fields[0]
+		}
 
-		if (b.chunk != nil) && (fields[0] != b.chunk[0][0]) {
-			b.stash = fields
+		if (len(b.chunk) > 0) && !bytes.Equal(fields[0], fseq) {
+
+			// Save just-read line for next call
+			b.stash = buf
+			b.bufs = b.bufs[0 : len(b.bufs)-1]
 
 			// Check sorting
 			if b.haslast {
-				if b.last > b.chunk[0][0] {
+				if b.last > string(b.chunk[0][0]) {
 					panic("file is not sorted")
 				}
 			}
-			b.last = b.chunk[0][0]
+			b.last = string(fields[0])
 			b.haslast = true
 
 			return true
@@ -150,6 +177,7 @@ func searchpairs(source, match [][]string, sem chan bool) {
 		}
 	}
 	<-sem
+	logger.Printf("searched %d %d", len(match), len(source))
 }
 
 func setupLog(fname string) {
@@ -176,10 +204,6 @@ func cpy(x [][]string) [][]string {
 
 func main() {
 
-	if len(os.Args) != 3 {
-		panic("wrong number of arguments")
-	}
-
 	var err error
 	nmiss, err = strconv.Atoi(os.Args[2])
 	if err != nil {
@@ -193,6 +217,8 @@ func main() {
 	outfile := strings.Replace(matchfile, "_smatch.txt.sz", s, -1)
 	setupLog(outfile)
 
+	pool = make(chan []byte)
+
 	// Read source sequences
 	fn := path.Join(dpath, sourcefile)
 	fid, err := os.Open(fn)
@@ -201,10 +227,7 @@ func main() {
 	}
 	defer fid.Close()
 	szr := snappy.NewReader(fid)
-	sscan := bufio.NewScanner(szr)
-	sbuf := make([]byte, 1024*1024)
-	sscan.Buffer(sbuf, 1024*1024)
-	source := &breader{scanner: sscan, name: "source"}
+	source := &breader{reader: szr, name: "source"}
 
 	// Read candidate match sequences
 	gid, err := os.Open(path.Join(dpath, matchfile))
@@ -213,10 +236,7 @@ func main() {
 	}
 	defer gid.Close()
 	szq := snappy.NewReader(gid)
-	mscan := bufio.NewScanner(szq)
-	sbuf = make([]byte, 1024*1024)
-	mscan.Buffer(sbuf, 1024*1024)
-	match := &breader{scanner: mscan, name: "match"}
+	match := &breader{reader: szq, name: "match"}
 
 	// Place to write results
 	out, err := os.Create(path.Join(dpath, outfile))
@@ -235,22 +255,16 @@ func main() {
 		}
 	}()
 
-	var ms runtime.MemStats
 	rsltChan = make(chan string)
 	sem := make(chan bool, concurrency)
 
 lp:
 	for ii := 0; ; ii++ {
 
-		if ii%100000 == 0 {
-			runtime.ReadMemStats(&ms)
-			logger.Printf("memory: %+v\n", ms.Alloc)
-		}
-
 		s := source.chunk[0][0]
 		m := match.chunk[0][0]
 
-		c := strings.Compare(s, m)
+		c := bytes.Compare(s, m)
 		switch {
 		case c == 0:
 			sem <- true
@@ -273,6 +287,7 @@ lp:
 		}
 	}
 
+	logger.Print("clearing channel")
 	for k := 0; k < concurrency; k++ {
 		sem <- true
 	}

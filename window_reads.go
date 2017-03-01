@@ -39,6 +39,32 @@ func setupLog() {
 	logger = log.New(fid, "", log.Lshortfile)
 }
 
+func checkRepeat(seq string) bool {
+
+	// Constant sequence
+	pass := false
+	for j := 1; j < len(seq); j++ {
+		if seq[j] != seq[j-1] {
+			pass = true
+			break
+		}
+	}
+	if !pass {
+		return false
+	}
+
+	// Dinucleotide repeat
+	pass = false
+	for j := 2; j < len(seq); j++ {
+		if seq[j] != seq[j-2] {
+			pass = true
+			break
+		}
+	}
+
+	return pass
+}
+
 func main() {
 
 	setupLog()
@@ -92,11 +118,17 @@ func main() {
 		seq := toks[1]
 		cnt := toks[0]
 
-		if q2 > len(seq) {
+		// Sequence is too short
+		if len(seq) < q2 {
 			continue
 		}
 
 		key := seq[q1:q2]
+
+		if !checkRepeat(key) {
+			continue
+		}
+
 		left := seq[0:q1]
 		right := seq[q2:len(seq)]
 		line = key + "\t" + left + "\t" + right + "\t" + cnt + "\n"

@@ -47,14 +47,13 @@ func source(sourcefile string) {
 			logger.Printf("sources: %d\n", lnum)
 		}
 
-		var na, nt int
 		xseq := []byte(ris.Seq)
 		for i, c := range xseq {
 			switch c {
 			case 'A':
-				na++
+				// pass
 			case 'T':
-				nt++
+				// pass
 			case 'C':
 				// pass
 			case 'G':
@@ -62,12 +61,6 @@ func source(sourcefile string) {
 			default:
 				xseq[i] = 'X'
 			}
-		}
-
-		// Drop if poly-A or poly-T TODO: the constant should
-		// be configurable
-		if na > len(xseq)-5 || nt > len(xseq)-5 {
-			continue
 		}
 
 		_, err := outw.Write(xseq)
