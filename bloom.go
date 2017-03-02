@@ -1,6 +1,5 @@
 // Identify possible matches of a set of source sequences into a set
-// of target sequences.  The source sequences must all have the same
-// length.  The target sequences may be of variable lengths.
+// of target sequences.
 //
 // The result may contain false positives, but will not have any false
 // negatives.
@@ -10,13 +9,11 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"flag"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"path"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 
@@ -48,8 +45,6 @@ const (
 )
 
 var (
-	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
-
 	// A log
 	logger *log.Logger
 
@@ -201,6 +196,10 @@ func search() {
 		}
 
 		line := scanner.Text()
+		if err := scanner.Err(); err != nil {
+			panic(err)
+		}
+
 		toks := strings.Split(line, "\t")
 		tname := toks[1]
 		seq := toks[0]
@@ -210,18 +209,7 @@ func search() {
 		}
 
 		limit <- true
-		go func(seq []byte, tname string) {
-
-			// Count A and T
-			var na, nt int
-			for _, x := range seq[0:hlen] {
-				switch x {
-				case 'A':
-					na++
-				case 'T':
-					nt++
-				}
-			}
+		go func(seq []byte, tname string, tnum int) {
 
 			// Initialize the hashes
 			hashes := make([]rollinghash.Hash32, nhash)
@@ -231,48 +219,37 @@ func search() {
 			}
 
 			// Check if the initial window is a match
-			g := true
-			for _, ha := range hashes {
-				x := uint64(ha.Sum32()) % bsize
-				f, err := smp.GetBit(x)
-				if err != nil {
-					panic(err)
+			if hp1 == 0 {
+				g := true
+				for _, ha := range hashes {
+					x := uint64(ha.Sum32()) % bsize
+					f, err := smp.GetBit(x)
+					if err != nil {
+						panic(err)
+					}
+					if !f {
+						g = false
+						break
+					}
 				}
-				if !f {
-					g = false
-					break
-				}
-			}
-			if g && hp1 == 0 && na < hlen-5 && nt < hlen-5 {
-				jz := 100 - hp2
-				if jz > len(seq) {
-					jz = len(seq)
-				}
-				hitchan <- rec{
-					mseq:  string(seq[0:hlen]),
-					left:  "",
-					right: string(seq[hlen:jz]),
-					tnum:  i,
-					pos:   0,
+				if g {
+					// First window matched
+					jz := 100 - hp2
+					if jz > len(seq) {
+						jz = len(seq)
+					}
+					hitchan <- rec{
+						mseq:  string(seq[0:hlen]),
+						left:  "",
+						right: string(seq[hlen:jz]),
+						tnum:  i,
+						pos:   0,
+					}
 				}
 			}
 
 			// Check the rest of the windows
 			for j := hlen; j < len(seq); j++ {
-
-				// Update the A/T counts
-				switch seq[j] {
-				case 'T':
-					nt++
-				case 'A':
-					na++
-				}
-				switch seq[j-hlen] {
-				case 'T':
-					nt--
-				case 'A':
-					na--
-				}
 
 				// Check for a match
 				g := true
@@ -290,39 +267,34 @@ func search() {
 				}
 
 				// Process a match
-				// TODO constants should be configurable
-				if g && j >= hp2-1 && na < hlen-5 && nt < hlen-5 {
+				if g && j >= hp2-1 {
 					// Matching sequence is jx:jy
 					jx := j - hlen + 1
 					jy := j + 1
 
 					// Left tail is jw:jx
 					jw := jx - hp1
-					if jw < 0 {
-						jw = 0
-					}
 
 					// Right tail is jy:jz
 					jz := jy + 100 - hp2
 					if jz > len(seq) {
+						// May not be long enough, but we don't now until we merge.
 						jz = len(seq)
 					}
 
-					hitchan <- rec{
-						mseq:  string(seq[jx:jy]),
-						left:  string(seq[jw:jx]),
-						right: string(seq[jy:jz]),
-						tnum:  i,
-						pos:   uint32(j - hlen + 1),
+					if jw >= 0 {
+						hitchan <- rec{
+							mseq:  string(seq[jx:jy]),
+							left:  string(seq[jw:jx]),
+							right: string(seq[jy:jz]),
+							tnum:  i,
+							pos:   uint32(j - hlen + 1),
+						}
 					}
 				}
 			}
 			<-limit
-		}([]byte(seq), tname)
-	}
-
-	if err := scanner.Err(); err != nil {
-		panic(err)
+		}([]byte(seq), tname, i)
 	}
 
 	for k := 0; k < concurrency; k++ {
@@ -341,16 +313,6 @@ func setupLogger() {
 }
 
 func main() {
-
-	flag.Parse()
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
 
 	if len(os.Args) != 4 {
 		panic("wrong number of arguments")

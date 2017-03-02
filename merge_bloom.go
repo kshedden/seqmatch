@@ -23,31 +23,58 @@ const (
 	// Path to all data files
 	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
 
+	// Exact line length of input file
+	lw int = 150
+
 	concurrency = 100
 )
 
 var (
 	logger *log.Logger
 
+	// Pool of reusable byte slices
 	pool chan []byte
 
 	nmiss int
 
-	rsltChan chan string
+	rsltChan chan []byte
 )
+
+type rec struct {
+	buf    []byte
+	fields [][]byte
+}
+
+func (r *rec) release() {
+	pool <- r.buf
+	r.buf = nil
+}
+
+func (r *rec) init() {
+	if r.buf != nil {
+		panic("cannot init non-nil rec")
+	}
+	select {
+	case r.buf = <-pool:
+	default:
+		r.buf = make([]byte, lw)
+	}
+}
+
+func (r *rec) setfields() {
+	r.fields = bytes.Fields(r.buf)
+}
 
 type breader struct {
 	reader io.Reader
-	bufs   [][]byte
-	chunk  [][][]byte
-	stash  []byte
+	recs   []*rec
+	stash  *rec
 	done   bool
 	lnum   int
 	name   string
 
 	// Used to confirm that file is sorted
-	last    string
-	haslast bool
+	last *rec
 }
 
 func (b *breader) Next() bool {
@@ -56,30 +83,22 @@ func (b *breader) Next() bool {
 		return false
 	}
 
-	// Start with an empty backing collection
-	for _, b := range b.bufs {
-		pool <- b
+	for _, b := range b.recs {
+		b.release()
 	}
-	b.bufs = b.bufs[0:0]
-	b.chunk = b.chunk[0:0]
+	b.recs = b.recs[0:0]
 
 	if b.stash != nil {
-		b.chunk = append(b.chunk, bytes.Split(b.stash, []byte("\t")))
+		b.recs = append(b.recs, b.stash)
 		b.stash = nil
 	}
 
-	lw := 150
-	var fseq []byte
-
 	for ii := 0; ; ii++ {
-		var buf []byte
-		select {
-		case buf = <-pool:
-		default:
-			buf = make([]byte, lw)
-		}
 
-		n, err := b.reader.Read(buf)
+		// Read a line
+		rx := new(rec)
+		rx.init()
+		n, err := b.reader.Read(rx.buf)
 		if err == io.EOF {
 			b.done = true
 			logger.Printf("%s done\n", b.name)
@@ -90,36 +109,26 @@ func (b *breader) Next() bool {
 		if n != lw {
 			panic("short line")
 		}
-		b.bufs = append(b.bufs, buf)
+		rx.setfields()
 
 		b.lnum++
 		if b.lnum%100000 == 0 {
-			logger.Printf("%s: %d %d %d\n", b.name, b.lnum, cap(b.chunk), len(b.chunk))
+			logger.Printf("%s: %d\n", b.name, b.lnum)
 		}
 
-		fields := bytes.Split(buf, []byte("\t"))
-		if ii == 0 {
-			fseq = fields[0]
-		}
-
-		if (len(b.chunk) > 0) && !bytes.Equal(fields[0], fseq) {
-
-			// Save just-read line for next call
-			b.stash = buf
-			b.bufs = b.bufs[0 : len(b.bufs)-1]
-
-			// Check sorting
-			if b.haslast {
-				if b.last > string(b.chunk[0][0]) {
+		if (len(b.recs) > 0) && !bytes.Equal(b.recs[0].fields[0], rx.fields[0]) {
+			b.stash = rx
+			return true
+		} else {
+			// Check sorting (harder to check in other branch of the if).
+			if ii > 0 {
+				if bytes.Compare(b.last.fields[0], rx.fields[0]) > 0 {
 					panic("file is not sorted")
 				}
 			}
-			b.last = string(fields[0])
-			b.haslast = true
-
-			return true
+			b.last = rx
+			b.recs = append(b.recs, rx)
 		}
-		b.chunk = append(b.chunk, fields)
 	}
 }
 
@@ -134,22 +143,22 @@ func cdiff(x, y []byte) int {
 	return c
 }
 
-func searchpairs(source, match [][]string, sem chan bool) {
+func searchpairs(source, match []*rec, sem chan bool) {
 
 	for _, mrec := range match {
 
-		//mtag := mchunk[0]
-		mlft := mrec[1]
-		mrgt := mrec[2]
-		mgene := mrec[3]
-		mpos := mrec[4]
+		//mtag := mrec.fields[0]
+		mlft := mrec.fields[1]
+		mrgt := mrec.fields[2]
+		mgene := mrec.fields[3]
+		mpos := mrec.fields[4]
 
 		for _, srec := range source {
 
-			stag := srec[0] // must equal mtag
-			slft := srec[1]
-			srgt := srec[2]
-			scnt := srec[3]
+			stag := srec.fields[0] // must equal mtag
+			slft := srec.fields[1]
+			srgt := srec.fields[2]
+			scnt := srec.fields[3]
 
 			// Gene ends before read would end, can't match.
 			if len(srgt) > len(mrgt) {
@@ -158,26 +167,44 @@ func searchpairs(source, match [][]string, sem chan bool) {
 
 			// Count differences
 			m := len(srgt)
-			nx := cdiff([]byte(mlft), []byte(slft))
-			nx += cdiff([]byte(mrgt[0:m]), []byte(srgt[0:m]))
+			nx := cdiff(mlft, slft)
+			nx += cdiff(mrgt[0:m], srgt[0:m])
 			if nx > nmiss {
 				continue
 			}
 
-			mposi, err := strconv.Atoi(mpos)
+			// unavoidable []byte to string copy
+			mposi, err := strconv.Atoi(string(mpos))
 			if err != nil {
 				panic(err)
 			}
 
-			rslt := fmt.Sprintf("%s\t", slft+stag+srgt)
-			rslt += fmt.Sprintf("%d\t", mposi-len(mlft))
-			rslt += fmt.Sprintf("%s\t", scnt)
-			rslt += fmt.Sprintf("%s\n", mgene)
-			rsltChan <- rslt
+			var buf []byte
+			select {
+			case buf = <-pool:
+			default:
+				buf = make([]byte, lw)
+			}
+			bbuf := NewBuffer(buf)
+
+			bbuf.Write(slft)
+			bbuf.Write(stag)
+			bbuf.Write(srgt)
+			x := fmt.Sprintf("\t%d\t%s\t%s\n", mposi-len(mlft), scnt, mgene)
+			bbuf.Write([]byte(x))
+			rsltChan <- bbuf.Bytes()
 		}
 	}
+	if len(match)*len(source) > 1000 {
+		logger.Printf("searched %d %d", len(match), len(source))
+	}
+	for _, x := range source {
+		x.release()
+	}
+	for _, x := range match {
+		x.release()
+	}
 	<-sem
-	logger.Printf("searched %d %d", len(match), len(source))
 }
 
 func setupLog(fname string) {
@@ -191,15 +218,6 @@ func setupLog(fname string) {
 		panic(err)
 	}
 	logger = log.New(fid, "", log.Lshortfile)
-}
-
-func cpy(x [][]string) [][]string {
-	y := make([][]string, len(x))
-	for i, v := range x {
-		y[i] = make([]string, len(v))
-		copy(y[i], v)
-	}
-	return y
 }
 
 func main() {
@@ -251,24 +269,27 @@ func main() {
 	// Harvest the results
 	go func() {
 		for r := range rsltChan {
-			out.Write([]byte(r))
+			out.Write(r)
+			pool <- r[0:lw]
 		}
 	}()
 
-	rsltChan = make(chan string)
+	rsltChan = make(chan []byte)
 	sem := make(chan bool, concurrency)
 
 lp:
 	for ii := 0; ; ii++ {
 
-		s := source.chunk[0][0]
-		m := match.chunk[0][0]
-
+		s := source.recs[0].fields[0]
+		m := match.recs[0].fields[0]
 		c := bytes.Compare(s, m)
+
 		switch {
 		case c == 0:
 			sem <- true
-			go searchpairs(cpy(source.chunk), cpy(match.chunk), sem)
+			go searchpairs(source.recs, match.recs, sem)
+			source.recs = source.recs[0:0] // don't release memory, searchpairs will do it
+			match.recs = match.recs[0:0]
 			ms := source.Next()
 			mb := match.Next()
 			if !(ms && mb) {
