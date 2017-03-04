@@ -5,7 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
+	"path"
+	
 	"github.com/kshedden/seqmatch/utils"
 )
 
@@ -267,8 +268,10 @@ func main() {
 	}
 
 	os.Setenv("LC_ALL", "C")
-	os.Setenv("GOPATH", "/home/kshedden/go_projects")
-	os.Setenv("PATH", os.Getenv("PATH")+":/home/kshedden/go_projects/bin")
+	home := os.Getenv("HOME")
+	gopath := path.Join(home, "go")
+	os.Setenv("GOPATH", gopath)
+	os.Setenv("PATH", os.Getenv("PATH")+":"+home+"/go/bin")
 
 	jsonfile = os.Args[1]
 	config = utils.ReadConfig(jsonfile)

@@ -14,7 +14,7 @@ type Config struct {
 	GeneFileName string
 
 	// Leveldb mapping gene integer id to full identifier.
-	GeneIdDB
+	GeneIdDB string
 
 	// The left end point of each window.
 	Windows []int
