@@ -7,5 +7,6 @@
     "MinReadLength": 50,
     "BloomSize": 4000000000,
     "NumHash": 20,
-    "MinDinuc": 5
+    "MinDinuc": 5,
+    "PMiss": 0.1
 }
