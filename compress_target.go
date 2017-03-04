@@ -10,7 +10,6 @@ import (
 	"encoding/binary"
 	"log"
 	"os"
-	"path"
 
 	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
@@ -22,22 +21,22 @@ var (
 
 	// Database mapping integer gene id (row number in sequence
 	// file) to full gene name.
-	db leveldb.DB
+	db *leveldb.DB
 
 	config *utils.Config
 )
 
-func targets() {
+func targets(sourcefile string) {
 
 	// Setup for reading the input file
-	inf, err := os.Open(config.GeneIdDB)
+	inf, err := os.Open(sourcefile)
 	if err != nil {
 		panic(err)
 	}
 	defer inf.Close()
 
 	// Setup for writing the output
-	out, err := os.Create(path.Join(dpath, outfile))
+	out, err := os.Create(config.GeneFileName)
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +58,7 @@ func targets() {
 		}
 
 		line := scanner.Bytes()
-		toks := bytes.Split(line, "\t")
+		toks := bytes.Split(line, []byte("\t"))
 		nam := toks[0]
 		seq := toks[1]
 
@@ -76,7 +75,7 @@ func targets() {
 		}
 
 		binary.LittleEndian.PutUint32(ibuf, uint32(lnum))
-		err = db.Put(ibuf, na)
+		err = db.Put(ibuf, nam, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -108,18 +107,26 @@ func setupLog() {
 
 func main() {
 
+	if len(os.Args) != 3 {
+		panic("wrong number of arguments")
+	}
+
 	jsonfile := os.Args[1]
 	config = utils.ReadConfig(jsonfile)
 
+	sourcefile := os.Args[2]
+
 	setupLog()
 
-	iddb, err := leveldb.OpenFile(config.GeneIdDB, nil)
+	os.RemoveAll(config.GeneIdDB)
+	var err error
+	db, err = leveldb.OpenFile(config.GeneIdDB, nil)
 	if err != nil {
 		logger.Print(err)
 		panic(err)
 	}
 	defer db.Close()
 
-	targets()
+	targets(sourcefile)
 	logger.Printf("Done")
 }

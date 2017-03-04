@@ -346,6 +346,7 @@ func search() {
 	}
 
 	close(hitchan)
+	logger.Printf("done with search")
 }
 
 func setupLogger() {
