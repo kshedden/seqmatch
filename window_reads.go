@@ -11,130 +11,126 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"path"
-	"strconv"
 	"strings"
 
 	"github.com/golang/snappy"
-)
-
-const (
-	// TODO this should be configurable
-	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
+	"github.com/kshedden/seqmatch/utils"
 )
 
 var (
 	logger *log.Logger
+
+	config *utils.Config
 )
 
 func setupLog() {
 
-	fid, err := os.Create("window_reads.log")
+	fname := strings.Replace(config.ReadFileName, ".fastq", "_window_reads.log", 1)
+	fid, err := os.Create(fname)
 	if err != nil {
 		panic(err)
 	}
 	logger = log.New(fid, "", log.Lshortfile)
 }
 
-func checkRepeat(seq string) bool {
-
-	// Constant sequence
-	pass := false
-	for j := 1; j < len(seq); j++ {
-		if seq[j] != seq[j-1] {
-			pass = true
-			break
-		}
-	}
-	if !pass {
-		return false
-	}
-
-	// Dinucleotide repeat
-	pass = false
-	for j := 2; j < len(seq); j++ {
-		if seq[j] != seq[j-2] {
-			pass = true
-			break
-		}
-	}
-
-	return pass
-}
-
 func main() {
 
-	setupLog()
-
-	if len(os.Args) != 4 {
+	if len(os.Args) != 2 {
 		panic("wrong number of arguments")
 	}
 
-	q1, err := strconv.Atoi(os.Args[2])
-	if err != nil {
-		panic(err)
-	}
-	q2, err := strconv.Atoi(os.Args[3])
-	if err != nil {
-		panic(err)
-	}
+	config = utils.ReadConfig(os.Args[1])
+
+	setupLog()
 
 	// Setup input reader
-	infile := os.Args[1]
-	fid, err := os.Open(path.Join(dpath, infile))
+	fname := config.ReadFileName
+	fname = strings.Replace(fname, ".fastq", "_sorted.txt.sz", 1)
+	fid, err := os.Open(fname)
 	if err != nil {
 		panic(err)
 	}
 	defer fid.Close()
 	rdr := snappy.NewReader(fid)
 
-	// Setup output writer
-	s := fmt.Sprintf("_win_%d_%d.txt.sz", q1, q2)
-	outfile := strings.Replace(infile, "_sorted.txt.sz", s, -1)
-	gid, err := os.Create(path.Join(dpath, outfile))
-	if err != nil {
-		panic(err)
-	}
-	defer gid.Close()
-	wtr := snappy.NewBufferedWriter(gid)
-	defer wtr.Close()
-
 	// Setup input scanner
 	scanner := bufio.NewScanner(rdr)
 	buf := make([]byte, 1024*1024)
 	scanner.Buffer(buf, 1024*1024)
 
+	// Setup output writers
+	var wtrs []io.Writer
+	for k := 0; k < len(config.Windows); k++ {
+		q1 := config.Windows[k]
+		q2 := q1 + config.WindowWidth
+		s := fmt.Sprintf("_win_%d_%d.txt.sz", q1, q2)
+		outfile := strings.Replace(config.ReadFileName, ".fastq", s, -1)
+		gid, err := os.Create(outfile)
+		if err != nil {
+			panic(err)
+		}
+		defer gid.Close()
+		wtr := snappy.NewBufferedWriter(gid)
+		defer wtr.Close()
+		wtrs = append(wtrs, wtr)
+	}
+
+	wk := make([]int, 25)
+
 	for jj := 0; scanner.Scan(); jj++ {
 
 		if jj%1000000 == 0 {
-			logger.Printf("%s %d\n", infile, jj)
+			logger.Printf("%d\n", jj)
 		}
 
-		line := scanner.Text()
-		toks := strings.Fields(line)
+		line := scanner.Bytes() // don't need copy
+		toks := bytes.Fields(line)
 		seq := toks[1]
 		cnt := toks[0]
 
-		// Sequence is too short
-		if len(seq) < q2 {
-			continue
-		}
+		var bbuf bytes.Buffer
+		for k := 0; k < len(config.Windows); k++ {
 
-		key := seq[q1:q2]
+			q1 := config.Windows[k]
+			q2 := q1 + config.WindowWidth
 
-		if !checkRepeat(key) {
-			continue
-		}
+			// Sequence is too short
+			if len(seq) < q2 {
+				continue
+			}
 
-		left := seq[0:q1]
-		right := seq[q2:len(seq)]
-		line = key + "\t" + left + "\t" + right + "\t" + cnt + "\n"
-		_, err := wtr.Write([]byte(line))
-		if err != nil {
-			panic(err)
+			key := seq[q1:q2]
+			if utils.CountDinuc(key, wk) < config.MinDinuc {
+				continue
+			}
+
+			bbuf.Reset()
+			_, err1 := bbuf.Write(key)
+			_, err2 := bbuf.Write([]byte("\t"))
+			_, err3 := bbuf.Write(seq[0:q1])
+			_, err4 := bbuf.Write([]byte("\t"))
+			_, err5 := bbuf.Write(seq[q2:len(seq)])
+			_, err6 := bbuf.Write([]byte("\t"))
+			_, err7 := bbuf.Write(cnt)
+			_, err8 := bbuf.Write([]byte("\n"))
+
+			for _, e := range []error{err1, err2, err3, err4, err5, err6, err7, err8} {
+				if e != nil {
+					logger.Print(e)
+					panic(e)
+				}
+			}
+
+			_, err := wtrs[k].Write(bbuf.Bytes())
+			if err != nil {
+				logger.Print(err)
+				panic(err)
+			}
 		}
 	}
 }

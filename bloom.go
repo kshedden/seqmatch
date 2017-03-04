@@ -10,63 +10,49 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"os"
-	"path"
-	"strconv"
 	"strings"
 
 	"github.com/chmduquesne/rollinghash"
 	"github.com/chmduquesne/rollinghash/buzhash"
 	"github.com/golang-collections/go-datastructures/bitarray"
 	"github.com/golang/snappy"
+	"github.com/kshedden/seqmatch/utils"
 )
 
 const (
-	// File containing genes we are matching into (target of matching)
-	targetfile string = "ALL_ABFVV_Genes_Derep_tr.txt.sz"
-
-	// Path to all data files
-	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
-
-	// Some big constants for convenience
-	mil int = 1000000
-	bil int = 1000 * mil
-
-	// Bloom filter size in bits
-	bsize uint64 = 4 * uint64(bil)
-
-	// Number of hashes to use in the Bloom filter
-	nhash int = 30
-
 	// Number of goroutines
 	concurrency int = 100
+
+	// Line length for output
+	lw int = 150
 )
 
 var (
 	// A log
 	logger *log.Logger
 
-	// File containing sequence reads we are matching (source of matching)
-	sourcefile string
+	config *utils.Config
 
-	// The array that backs the Bloom filter
-	smp bitarray.BitArray
+	// Bitarrays that back the Bloom filter
+	smp []bitarray.BitArray
 
 	// Tables to produce independent running hashes
 	tables [][256]uint32
 
-	// The hash is computed from this subinterval
-	hp1, hp2 int
+	// Communicate results back to driver
+	hitchan chan rec
 
-	// The length of the hash window
-	hlen int
+	// Semaphore for limiting goroutines
+	limit chan bool
 )
 
 func genTables() {
-	tables = make([][256]uint32, nhash)
-	for j := 0; j < nhash; j++ {
+	tables = make([][256]uint32, config.NumHash)
+	for j := 0; j < config.NumHash; j++ {
 		mp := make(map[uint32]bool)
 		for i := 0; i < 256; i++ {
 			for {
@@ -83,60 +69,229 @@ func genTables() {
 
 func buildBloom() {
 
-	fid, err := os.Open(path.Join(dpath, sourcefile))
-	if err != nil {
-		panic(err)
-	}
-	defer fid.Close()
-	snr := snappy.NewReader(fid)
-
-	scanner := bufio.NewScanner(snr)
-
-	hashes := make([]rollinghash.Hash32, nhash)
+	hashes := make([]rollinghash.Hash32, config.NumHash)
 	for j, _ := range hashes {
 		hashes[j] = buzhash.NewFromByteArray(tables[j])
 	}
 
+	fname := strings.Replace(config.ReadFileName, ".fastq", "_sorted.txt.sz", 1)
+	fid, err := os.Open(fname)
+	if err != nil {
+		logger.Print(err)
+		panic(err)
+	}
+	defer fid.Close()
+	snr := snappy.NewReader(fid)
+	scanner := bufio.NewScanner(snr)
+
+	wk := make([]int, 25)
+
 	for j := 0; scanner.Scan(); j++ {
 
-		if j%mil == 0 {
+		if j%1000000 == 0 {
 			logger.Printf("%d\n", j)
 		}
 
-		line := scanner.Text()
-		toks := strings.Fields(line)
-		seq := toks[0]
+		line := scanner.Bytes()
+		toks := bytes.Fields(line)
+		seq := toks[1]
 
-		for _, ha := range hashes {
-			ha.Reset()
-			ha.Write([]byte(seq))
-			x := uint64(ha.Sum32()) % bsize
-			err := smp.SetBit(x)
-			if err != nil {
-				panic(err)
+		for k := 0; k < len(config.Windows); k++ {
+			q1 := config.Windows[k]
+			q2 := q1 + config.WindowWidth
+			if q2 > len(seq) {
+				continue
+			}
+			seqw := seq[q1:q2]
+			if utils.CountDinuc(seqw, wk) < config.MinDinuc {
+				continue
+			}
+
+			for _, ha := range hashes {
+				ha.Reset()
+				ha.Write(seqw)
+				x := uint64(ha.Sum32()) % config.BloomSize
+				err := smp[k].SetBit(x)
+				if err != nil {
+					logger.Print(err)
+					panic(err)
+				}
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
+		logger.Print(err)
 		panic(err)
 	}
 
-	logger.Printf("Done constructing filter")
+	logger.Printf("Done constructing filters")
 }
 
 type rec struct {
 	mseq  string
 	left  string
 	right string
+	win   int
 	tnum  int
 	pos   uint32
 }
 
+// checkwin returns the indices of the Bloom filters that match the
+// current state of the hashes.
+func checkwin(ix []int, iw []uint64, hashes []rollinghash.Hash32) []int {
+
+	ix = ix[0:0]
+	for j, ha := range hashes {
+		iw[j] = uint64(ha.Sum32()) % config.BloomSize
+	}
+
+	for k, ba := range smp {
+		g := true
+		for j, _ := range hashes {
+			f, err := ba.GetBit(iw[j])
+			if err != nil {
+				logger.Print(err)
+				panic(err)
+			}
+			if !f {
+				g = false
+				break
+			}
+		}
+		if g {
+			ix = append(ix, k)
+		}
+	}
+
+	return ix
+}
+
+func processseq(seq []byte, genenum int) {
+
+	hashes := make([]rollinghash.Hash32, config.NumHash)
+	for j, _ := range hashes {
+		hashes[j] = buzhash.NewFromByteArray(tables[j])
+	}
+
+	hlen := config.WindowWidth
+	for j, _ := range hashes {
+		hashes[j].Write(seq[0:hlen])
+	}
+	ix := make([]int, len(smp))
+	iw := make([]uint64, config.NumHash)
+
+	// Check if the initial window is a match
+	ix = checkwin(ix, iw, hashes)
+	for _, i := range ix {
+
+		q1 := config.Windows[i]
+		if q1 != 0 {
+			continue
+		}
+		q2 := q1 + config.WindowWidth
+
+		jz := 100 - q2
+		if jz > len(seq) {
+			jz = len(seq)
+		}
+		hitchan <- rec{
+			mseq:  string(seq[0:hlen]),
+			left:  "",
+			right: string(seq[hlen:jz]),
+			tnum:  genenum,
+			win:   i,
+			pos:   0,
+		}
+	}
+
+	// Check the rest of the windows
+	for j := hlen; j < len(seq); j++ {
+
+		for _, ha := range hashes {
+			ha.Roll(seq[j])
+		}
+		ix = checkwin(ix, iw, hashes)
+
+		// Process a match
+		for _, i := range ix {
+
+			q1 := config.Windows[i]
+			q2 := q1 + config.WindowWidth
+			if j < q2-1 {
+				continue
+			}
+
+			// Matching sequence is jx:jy
+			jx := j - hlen + 1
+			jy := j + 1
+
+			// Left tail is jw:jx
+			jw := jx - q1
+
+			// Right tail is jy:jz
+			jz := jy + 100 - q2
+			if jz > len(seq) {
+				// May not be long enough, but we don't know until we merge.
+				jz = len(seq)
+			}
+
+			if jw >= 0 {
+				hitchan <- rec{
+					mseq:  string(seq[jx:jy]),
+					left:  string(seq[jw:jx]),
+					right: string(seq[jy:jz]),
+					tnum:  genenum,
+					win:   i,
+					pos:   uint32(j - hlen + 1),
+				}
+			}
+		}
+	}
+	<-limit
+}
+
+// Retrieve the results and write to disk
+func harvest(wtrs []io.Writer) {
+
+	bb := bytes.Repeat([]byte(" "), lw)
+	bb[lw-1] = byte('\n')
+
+	for r := range hitchan {
+
+		wtr := wtrs[r.win]
+
+		n1, err1 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.mseq)))
+		n2, err2 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.left)))
+		n3, err3 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.right)))
+		n4, err4 := wtr.Write([]byte(fmt.Sprintf("%d\t", r.tnum)))
+		n5, err5 := wtr.Write([]byte(fmt.Sprintf("%d", r.pos)))
+
+		for _, err := range []error{err1, err2, err3, err4, err5} {
+			if err != nil {
+				logger.Print(err)
+				panic("writing error")
+			}
+		}
+
+		n := n1 + n2 + n3 + n4 + n5
+		if n > lw {
+			panic("output line is too long")
+		}
+
+		_, err := wtr.Write(bb[n:lw])
+		if err != nil {
+			logger.Print(err)
+			panic(err)
+		}
+	}
+}
+
 func search() {
 
-	fid, err := os.Open(path.Join(dpath, targetfile))
+	fid, err := os.Open(config.GeneFileName)
 	if err != nil {
+		logger.Print(err)
 		panic(err)
 	}
 	defer fid.Close()
@@ -147,193 +302,100 @@ func search() {
 	sbuf := make([]byte, 1024*1024)
 	scanner.Buffer(sbuf, 1024*1024)
 
-	hitchan := make(chan rec)
-	limit := make(chan bool, concurrency)
+	hitchan = make(chan rec)
+	limit = make(chan bool, concurrency)
 
-	outname := strings.Replace(sourcefile, "_sorted.txt.sz", "_bmatch.txt.sz", -1)
-	out, err := os.Create(path.Join(dpath, outname))
-	if err != nil {
-		panic(err)
-	}
-	defer out.Close()
-	wtr := snappy.NewBufferedWriter(out)
-	defer wtr.Close()
-
-	// Retrieve the results and write to disk
-	go func() {
-
-		lw := 150
-		bb := bytes.Repeat([]byte(" "), 150)
-		bb[lw-1] = byte('\n')
-
-		for r := range hitchan {
-			n1, err1 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.mseq)))
-			n2, err2 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.left)))
-			n3, err3 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.right)))
-			n4, err4 := wtr.Write([]byte(fmt.Sprintf("%d\t", r.tnum)))
-			n5, err5 := wtr.Write([]byte(fmt.Sprintf("%d", r.pos)))
-
-			if err1 != nil || err2 != nil || err3 != nil || err4 != nil || err5 != nil {
-				panic("writing error")
-			}
-
-			n := n1 + n2 + n3 + n4 + n5
-			if n > lw {
-				panic("output line is too long")
-			}
-
-			_, err := wtr.Write(bb[n:lw])
-			if err != nil {
-				panic(err)
-			}
+	var wtrs []io.Writer
+	for k := 0; k < len(config.Windows); k++ {
+		q1 := config.Windows[k]
+		s := fmt.Sprintf("_%d_%d_bmatch.txt.sz", q1, q1+config.WindowWidth)
+		outname := strings.Replace(config.ReadFileName, ".fastq", s, 1)
+		out, err := os.Create(outname)
+		if err != nil {
+			logger.Print(err)
+			panic(err)
 		}
-	}()
+		defer out.Close()
+		wtr := snappy.NewBufferedWriter(out)
+		defer wtr.Close()
+		wtrs = append(wtrs, wtr)
+	}
+	go harvest(wtrs)
 
 	for i := 0; scanner.Scan(); i++ {
 
-		if i%mil == 0 {
+		if i%1000000 == 0 {
 			logger.Printf("%d\n", i)
 		}
 
-		line := scanner.Text()
+		line := scanner.Text() // need a copy here
 		if err := scanner.Err(); err != nil {
+			logger.Print(err)
 			panic(err)
 		}
 
 		toks := strings.Split(line, "\t")
-		tname := toks[1]
 		seq := toks[0]
 
-		if len(seq) < hlen {
-			continue
-		}
-
 		limit <- true
-		go func(seq []byte, tname string, tnum int) {
-
-			// Initialize the hashes
-			hashes := make([]rollinghash.Hash32, nhash)
-			for j, _ := range hashes {
-				hashes[j] = buzhash.NewFromByteArray(tables[j])
-				hashes[j].Write(seq[0:hlen])
-			}
-
-			// Check if the initial window is a match
-			if hp1 == 0 {
-				g := true
-				for _, ha := range hashes {
-					x := uint64(ha.Sum32()) % bsize
-					f, err := smp.GetBit(x)
-					if err != nil {
-						panic(err)
-					}
-					if !f {
-						g = false
-						break
-					}
-				}
-				if g {
-					// First window matched
-					jz := 100 - hp2
-					if jz > len(seq) {
-						jz = len(seq)
-					}
-					hitchan <- rec{
-						mseq:  string(seq[0:hlen]),
-						left:  "",
-						right: string(seq[hlen:jz]),
-						tnum:  i,
-						pos:   0,
-					}
-				}
-			}
-
-			// Check the rest of the windows
-			for j := hlen; j < len(seq); j++ {
-
-				// Check for a match
-				g := true
-				for _, ha := range hashes {
-					ha.Roll(seq[j])
-					if g {
-						// Still a candidate, keep checking
-						x := uint64(ha.Sum32()) % bsize
-						f, err := smp.GetBit(x)
-						if err != nil {
-							panic(err)
-						}
-						g = g && f
-					}
-				}
-
-				// Process a match
-				if g && j >= hp2-1 {
-					// Matching sequence is jx:jy
-					jx := j - hlen + 1
-					jy := j + 1
-
-					// Left tail is jw:jx
-					jw := jx - hp1
-
-					// Right tail is jy:jz
-					jz := jy + 100 - hp2
-					if jz > len(seq) {
-						// May not be long enough, but we don't now until we merge.
-						jz = len(seq)
-					}
-
-					if jw >= 0 {
-						hitchan <- rec{
-							mseq:  string(seq[jx:jy]),
-							left:  string(seq[jw:jx]),
-							right: string(seq[jy:jz]),
-							tnum:  i,
-							pos:   uint32(j - hlen + 1),
-						}
-					}
-				}
-			}
-			<-limit
-		}([]byte(seq), tname, i)
+		go processseq([]byte(seq), i)
 	}
 
-	for k := 0; k < concurrency; k++ {
+	for k := 0; k < concurrency; k += 1 {
 		limit <- true
 	}
+
 	close(hitchan)
 }
 
 func setupLogger() {
-	logname := strings.Replace(sourcefile, ".txt.sz", "_bmatch.log", -1)
+	logname := strings.Replace(config.ReadFileName, ".fastq", "_bloom.log", 1)
 	logfid, err := os.Create(logname)
 	if err != nil {
+		logger.Print(err)
 		panic(err)
 	}
 	logger = log.New(logfid, "", log.Lshortfile)
 }
 
+func estimateFullness() {
+
+	n := 1000
+	logger.Printf("Bloom filter fill rates:\n")
+
+	for j, ba := range smp {
+		c := 0
+		for k := 0; k < n; k++ {
+			i := uint64(rand.Int63()) % config.BloomSize
+			f, err := ba.GetBit(i)
+			if err != nil {
+				panic(err)
+			}
+			if f {
+				c++
+			}
+		}
+		logger.Printf("%3d %.3f\n", j, float64(c)/float64(n))
+	}
+}
+
 func main() {
 
-	if len(os.Args) != 4 {
+	if len(os.Args) != 2 {
 		panic("wrong number of arguments")
 	}
-	sourcefile = os.Args[1]
-	var err error
-	hp1, err = strconv.Atoi(os.Args[2])
-	if err != nil {
-		panic(err)
-	}
-	hp2, err = strconv.Atoi(os.Args[3])
-	if err != nil {
-		panic(err)
-	}
-	hlen = hp2 - hp1
+
+	config = utils.ReadConfig(os.Args[1])
 
 	setupLogger()
 	genTables()
 
-	smp = bitarray.NewBitArray(bsize)
+	smp = make([]bitarray.BitArray, len(config.Windows))
+	for k, _ := range smp {
+		smp[k] = bitarray.NewBitArray(config.BloomSize)
+	}
 
 	buildBloom()
+	estimateFullness()
 	search()
 }

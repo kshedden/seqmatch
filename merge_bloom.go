@@ -12,17 +12,14 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 
 	"github.com/golang/snappy"
+	"github.com/kshedden/seqmatch/utils"
 )
 
 const (
-	// Path to all data files
-	dpath string = "/scratch/andjoh_fluxm/tealfurn/CSCAR"
-
 	// Exact line length of input file
 	lw int = 150
 
@@ -32,10 +29,17 @@ const (
 var (
 	logger *log.Logger
 
+	config *utils.Config
+
+	pmiss float64
+
 	// Pool of reusable byte slices
 	pool chan []byte
 
-	nmiss int
+	// The window to process and its start/end position
+	win int
+	q1  int
+	q2  int
 
 	rsltChan chan []byte
 )
@@ -46,7 +50,14 @@ type rec struct {
 }
 
 func (r *rec) release() {
-	pool <- r.buf
+	if r.buf == nil {
+		panic("nothing to release")
+	}
+	select {
+	case pool <- r.buf:
+	default:
+		// pool is full, dump the buffer to the garbage
+	}
 	r.buf = nil
 }
 
@@ -57,6 +68,7 @@ func (r *rec) init() {
 	select {
 	case r.buf = <-pool:
 	default:
+		// Pool is empty, make a new buffer
 		r.buf = make([]byte, lw)
 	}
 }
@@ -98,7 +110,7 @@ func (b *breader) Next() bool {
 		// Read a line
 		rx := new(rec)
 		rx.init()
-		n, err := b.reader.Read(rx.buf)
+		n, err := io.ReadFull(b.reader, rx.buf)
 		if err == io.EOF {
 			b.done = true
 			logger.Printf("%s done\n", b.name)
@@ -107,6 +119,9 @@ func (b *breader) Next() bool {
 			panic(err)
 		}
 		if n != lw {
+			fmt.Printf("%v\n", rx.buf[135])
+			fmt.Printf("%d\n", len(rx.buf))
+			fmt.Printf("n=%d\n", n)
 			panic("short line")
 		}
 		rx.setfields()
@@ -160,6 +175,8 @@ func searchpairs(source, match []*rec, sem chan bool) {
 			srgt := srec.fields[2]
 			scnt := srec.fields[3]
 
+			nmiss := int(pmiss * float64(len(stag)+len(slft)+len(srgt)))
+
 			// Gene ends before read would end, can't match.
 			if len(srgt) > len(mrgt) {
 				continue
@@ -185,7 +202,7 @@ func searchpairs(source, match []*rec, sem chan bool) {
 			default:
 				buf = make([]byte, lw)
 			}
-			bbuf := NewBuffer(buf)
+			bbuf := bytes.NewBuffer(buf)
 
 			bbuf.Write(slft)
 			bbuf.Write(stag)
@@ -207,11 +224,9 @@ func searchpairs(source, match []*rec, sem chan bool) {
 	<-sem
 }
 
-func setupLog(fname string) {
-	toks := strings.Split(fname, "_")
-	m := len(toks)
-	logname := toks[m-4] + "_" + toks[m-3] + "_" + toks[m-2]
-	logname = "merge_bloom_" + logname + ".log"
+func setupLog(win int) {
+	s := fmt.Sprintf("_mergebloom_%d.log", win)
+	logname := strings.Replace(config.ReadFileName, ".fastq", s, 1)
 
 	fid, err := os.Create(logname)
 	if err != nil {
@@ -222,24 +237,37 @@ func setupLog(fname string) {
 
 func main() {
 
+	if len(os.Args) != 3 {
+		panic("wrong number of arguments")
+	}
+
+	config = utils.ReadConfig(os.Args[1])
+
 	var err error
-	nmiss, err = strconv.Atoi(os.Args[2])
+	win, err = strconv.Atoi(os.Args[2])
 	if err != nil {
 		panic(err)
 	}
 
-	sourcefile := os.Args[1]
-	matchfile := strings.Replace(sourcefile, "_sorted.txt.sz", "_smatch.txt.sz", -1)
+	pmiss, err = strconv.ParseFloat(os.Args[2], 64)
+	if err != nil {
+		panic(err)
+	}
 
-	s := fmt.Sprintf("_%d_rmatch.txt", nmiss)
-	outfile := strings.Replace(matchfile, "_smatch.txt.sz", s, -1)
-	setupLog(outfile)
+	q1 = config.Windows[win]
+	q2 = q1 + config.WindowWidth
+	s := fmt.Sprintf("_win_%d_%d.txt.sz", q1, q2)
+	sourcefile := strings.Replace(config.ReadFileName, ".fastq", s, 1)
+	matchfile := strings.Replace(sourcefile, "_sorted.txt.sz", "_smatch.txt.sz", 1)
 
-	pool = make(chan []byte)
+	s = fmt.Sprintf("_%.0f_rmatch.txt", 100*config.PMiss)
+	outfile := strings.Replace(config.ReadFileName, ".fastq", s, 1)
+	setupLog(win)
+
+	pool = make(chan []byte, 10000)
 
 	// Read source sequences
-	fn := path.Join(dpath, sourcefile)
-	fid, err := os.Open(fn)
+	fid, err := os.Open(sourcefile)
 	if err != nil {
 		panic(err)
 	}
@@ -248,7 +276,7 @@ func main() {
 	source := &breader{reader: szr, name: "source"}
 
 	// Read candidate match sequences
-	gid, err := os.Open(path.Join(dpath, matchfile))
+	gid, err := os.Open(matchfile)
 	if err != nil {
 		panic(err)
 	}
@@ -257,7 +285,7 @@ func main() {
 	match := &breader{reader: szq, name: "match"}
 
 	// Place to write results
-	out, err := os.Create(path.Join(dpath, outfile))
+	out, err := os.Create(outfile)
 	if err != nil {
 		panic(err)
 	}
@@ -270,7 +298,11 @@ func main() {
 	go func() {
 		for r := range rsltChan {
 			out.Write(r)
-			pool <- r[0:lw]
+			select {
+			case pool <- r[0:cap(r)]:
+			default:
+				// pool is full, buffer goes to garbage
+			}
 		}
 	}()
 
