@@ -13,8 +13,8 @@ type Config struct {
 	// The name of the file containing the genes.
 	GeneFileName string
 
-	// Leveldb mapping gene integer id to full identifier.
-	GeneIdDB string
+	// Gene ids
+	GeneIdFileName string
 
 	// The left end point of each window.
 	Windows []int
@@ -28,9 +28,8 @@ type Config struct {
 	// The number of hash functions to use in the Bloom filter.
 	NumHash int
 
-	// The allowed proportion of mismatching values outside the
-	// exact-match window.
-	PMiss float64
+	// The minimum allowed proportion matching values.
+	PMatch float64
 
 	// The exact-match window must have this many distinct
 	// dinucleotides.

@@ -7,11 +7,13 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"os"
+	"path"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 
@@ -24,6 +26,11 @@ const (
 	lw int = 150
 
 	concurrency = 100
+
+	profile = false
+
+	// Maintain a pool of byte arrays of length lw
+	poolsize = 10000
 )
 
 var (
@@ -31,16 +38,17 @@ var (
 
 	config *utils.Config
 
-	pmiss float64
+	// The required matching proportion (0 <= pmatch <= 1).
+	pmatch float64
 
 	// Pool of reusable byte slices
 	pool chan []byte
 
-	// The window to process and its start/end position
-	win int
-	q1  int
-	q2  int
+	win int // The window to process, win=0,1,...
+	q1  int // The start position of the window
+	q2  int // The end position of the window
 
+	// Pass results to driver then write to disk
 	rsltChan chan []byte
 )
 
@@ -49,41 +57,43 @@ type rec struct {
 	fields [][]byte
 }
 
+func (r *rec) Print() {
+	fmt.Printf("len(buf)=%d\n", len(r.buf))
+	for k, f := range r.fields {
+		fmt.Printf("%d %s\n", k, string(f))
+	}
+}
+
 func (r *rec) release() {
 	if r.buf == nil {
+		logger.Print("nothing to release")
 		panic("nothing to release")
 	}
-	select {
-	case pool <- r.buf:
-	default:
-		// pool is full, dump the buffer to the garbage
-	}
+	putbuf(r.buf)
 	r.buf = nil
+	r.fields = nil
 }
 
 func (r *rec) init() {
 	if r.buf != nil {
+		logger.Print("cannot init non-nil rec")
 		panic("cannot init non-nil rec")
 	}
-	select {
-	case r.buf = <-pool:
-	default:
-		// Pool is empty, make a new buffer
-		r.buf = make([]byte, lw)
-	}
+	r.buf = getbuf()
+	r.buf = r.buf[0:0]
 }
 
 func (r *rec) setfields() {
-	r.fields = bytes.Fields(r.buf)
+	r.fields = bytes.Split(r.buf, []byte("\t"))
 }
 
 type breader struct {
-	reader io.Reader
-	recs   []*rec
-	stash  *rec
-	done   bool
-	lnum   int
-	name   string
+	scanner *bufio.Scanner
+	recs    []*rec
+	stash   *rec
+	done    bool
+	lnum    int
+	name    string
 
 	// Used to confirm that file is sorted
 	last *rec
@@ -105,25 +115,18 @@ func (b *breader) Next() bool {
 		b.stash = nil
 	}
 
-	for ii := 0; ; ii++ {
+	for ii := 0; b.scanner.Scan(); ii++ {
 
-		// Read a line
+		// Process a line
+		bb := b.scanner.Bytes()
+		if len(bb) > lw {
+			logger.Print("line too long")
+			panic("line too long")
+		}
 		rx := new(rec)
 		rx.init()
-		n, err := io.ReadFull(b.reader, rx.buf)
-		if err == io.EOF {
-			b.done = true
-			logger.Printf("%s done\n", b.name)
-			return true
-		} else if err != nil {
-			panic(err)
-		}
-		if n != lw {
-			fmt.Printf("%v\n", rx.buf[135])
-			fmt.Printf("%d\n", len(rx.buf))
-			fmt.Printf("n=%d\n", n)
-			panic("short line")
-		}
+		rx.buf = rx.buf[0:len(bb)]
+		copy(rx.buf, bb)
 		rx.setfields()
 
 		b.lnum++
@@ -138,6 +141,7 @@ func (b *breader) Next() bool {
 			// Check sorting (harder to check in other branch of the if).
 			if ii > 0 {
 				if bytes.Compare(b.last.fields[0], rx.fields[0]) > 0 {
+					logger.Print("file is not sorted")
 					panic("file is not sorted")
 				}
 			}
@@ -145,6 +149,15 @@ func (b *breader) Next() bool {
 			b.recs = append(b.recs, rx)
 		}
 	}
+
+	if err := b.scanner.Err(); err != nil {
+		logger.Print(err)
+		panic(err)
+	}
+
+	b.done = true
+	logger.Printf("%s done", b.name)
+	return true
 }
 
 // cdiff returns the number of unequal values in two byte sequences
@@ -158,9 +171,33 @@ func cdiff(x, y []byte) int {
 	return c
 }
 
-func searchpairs(source, match []*rec, sem chan bool) {
+func putbuf(buf []byte) {
+	select {
+	case pool <- buf[0:0]:
+	default:
+		// pool is full, buffer goes to garbage
+	}
+}
 
-	for _, mrec := range match {
+func getbuf() []byte {
+	var buf []byte
+	select {
+	case buf = <-pool:
+		buf = buf[0:0]
+	default:
+		buf = make([]byte, 0, lw)
+	}
+	return buf
+}
+
+func searchpairs(source, match []*rec, limit chan bool) {
+
+	var stag []byte
+	for jm, mrec := range match {
+
+		if jm == 0 && len(match)*len(source) > 10000 {
+			logger.Printf("searching %d %d %s...", len(match), len(source), string(stag))
+		}
 
 		//mtag := mrec.fields[0]
 		mlft := mrec.fields[1]
@@ -170,12 +207,12 @@ func searchpairs(source, match []*rec, sem chan bool) {
 
 		for _, srec := range source {
 
-			stag := srec.fields[0] // must equal mtag
+			stag = srec.fields[0] // must equal mtag
 			slft := srec.fields[1]
 			srgt := srec.fields[2]
 			scnt := srec.fields[3]
 
-			nmiss := int(pmiss * float64(len(stag)+len(slft)+len(srgt)))
+			nmiss := int((1 - pmatch) * float64(len(stag)+len(slft)+len(srgt)))
 
 			// Gene ends before read would end, can't match.
 			if len(srgt) > len(mrgt) {
@@ -191,17 +228,13 @@ func searchpairs(source, match []*rec, sem chan bool) {
 			}
 
 			// unavoidable []byte to string copy
-			mposi, err := strconv.Atoi(string(mpos))
+			mposi, err := strconv.Atoi(strings.TrimRight(string(mpos), " "))
 			if err != nil {
+				logger.Print(err)
 				panic(err)
 			}
 
-			var buf []byte
-			select {
-			case buf = <-pool:
-			default:
-				buf = make([]byte, lw)
-			}
+			buf := getbuf()
 			bbuf := bytes.NewBuffer(buf)
 
 			bbuf.Write(slft)
@@ -210,18 +243,22 @@ func searchpairs(source, match []*rec, sem chan bool) {
 			x := fmt.Sprintf("\t%d\t%s\t%s\n", mposi-len(mlft), scnt, mgene)
 			bbuf.Write([]byte(x))
 			rsltChan <- bbuf.Bytes()
+
+			// one match is enough
+			break
 		}
 	}
-	if len(match)*len(source) > 1000 {
-		logger.Printf("searched %d %d", len(match), len(source))
+	if len(match)*len(source) > 10000 {
+		logger.Printf("done")
 	}
+
 	for _, x := range source {
 		x.release()
 	}
 	for _, x := range match {
 		x.release()
 	}
-	<-sem
+	<-limit
 }
 
 func setupLog(win int) {
@@ -230,15 +267,37 @@ func setupLog(win int) {
 
 	fid, err := os.Create(logname)
 	if err != nil {
+		logger.Print(err)
 		panic(err)
 	}
 	logger = log.New(fid, "", log.Lshortfile)
+}
+
+func rcpy(r []*rec) []*rec {
+	x := make([]*rec, len(r))
+	for j, _ := range x {
+		x[j] = new(rec)
+		x[j].init()
+		x[j].buf = x[j].buf[0:len(r[j].buf)]
+		copy(x[j].buf, r[j].buf)
+		x[j].setfields()
+	}
+	return x
 }
 
 func main() {
 
 	if len(os.Args) != 3 {
 		panic("wrong number of arguments")
+	}
+
+	if profile {
+		f, err := os.Create("merge_bloom_cpuprof")
+		if err != nil {
+			panic(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
 	}
 
 	config = utils.ReadConfig(os.Args[1])
@@ -248,48 +307,61 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	pmiss, err = strconv.ParseFloat(os.Args[2], 64)
-	if err != nil {
-		panic(err)
-	}
+	setupLog(win)
 
 	q1 = config.Windows[win]
 	q2 = q1 + config.WindowWidth
-	s := fmt.Sprintf("_win_%d_%d.txt.sz", q1, q2)
-	sourcefile := strings.Replace(config.ReadFileName, ".fastq", s, 1)
-	matchfile := strings.Replace(sourcefile, "_sorted.txt.sz", "_smatch.txt.sz", 1)
+	s := fmt.Sprintf("_win_%d_%d_sorted.txt.sz", q1, q2)
+	d, f := path.Split(config.ReadFileName)
+	f = strings.Replace(f, ".fastq", s, 1)
+	sourcefile := path.Join(d, "tmp", f)
+	logger.Printf("sourcefile: %s", sourcefile)
 
-	s = fmt.Sprintf("_%.0f_rmatch.txt", 100*config.PMiss)
-	outfile := strings.Replace(config.ReadFileName, ".fastq", s, 1)
-	setupLog(win)
+	s = fmt.Sprintf("_%d_%d_smatch.txt.sz", q1, q2)
+	d, f = path.Split(config.ReadFileName)
+	f = strings.Replace(f, ".fastq", s, 1)
+	matchfile := path.Join(d, "tmp", f)
+	logger.Printf("matchfile: %s", matchfile)
 
-	pool = make(chan []byte, 10000)
+	s = fmt.Sprintf("_%d_%d_%.0f_rmatch.txt.sz", q1, q2, 100*config.PMatch)
+	d, f = path.Split(config.ReadFileName)
+	f = strings.Replace(f, ".fastq", s, 1)
+	outfile := path.Join(d, "tmp", f)
+	logger.Printf("outfile: %s", outfile)
+
+	pool = make(chan []byte, poolsize)
 
 	// Read source sequences
 	fid, err := os.Open(sourcefile)
 	if err != nil {
+		logger.Print(err)
 		panic(err)
 	}
 	defer fid.Close()
 	szr := snappy.NewReader(fid)
-	source := &breader{reader: szr, name: "source"}
+	scanner := bufio.NewScanner(szr)
+	source := &breader{scanner: scanner, name: "source"}
 
 	// Read candidate match sequences
 	gid, err := os.Open(matchfile)
 	if err != nil {
+		logger.Print(err)
 		panic(err)
 	}
 	defer gid.Close()
 	szq := snappy.NewReader(gid)
-	match := &breader{reader: szq, name: "match"}
+	scanner = bufio.NewScanner(szq)
+	match := &breader{scanner: scanner, name: "match"}
 
 	// Place to write results
-	out, err := os.Create(outfile)
+	fi, err := os.Create(outfile)
 	if err != nil {
+		logger.Print(err)
 		panic(err)
 	}
-	defer out.Close()
+	defer fi.Close()
+	out := snappy.NewBufferedWriter(fi)
+	defer out.Flush()
 
 	source.Next()
 	match.Next()
@@ -298,51 +370,56 @@ func main() {
 	go func() {
 		for r := range rsltChan {
 			out.Write(r)
-			select {
-			case pool <- r[0:cap(r)]:
-			default:
-				// pool is full, buffer goes to garbage
-			}
+			putbuf(r)
 		}
 	}()
 
-	rsltChan = make(chan []byte)
-	sem := make(chan bool, concurrency)
+	rsltChan = make(chan []byte, 100)
+	limit := make(chan bool, concurrency)
 
 lp:
 	for ii := 0; ; ii++ {
+
+		if profile && ii > 100000 {
+			break
+		}
 
 		s := source.recs[0].fields[0]
 		m := match.recs[0].fields[0]
 		c := bytes.Compare(s, m)
 
+		ms := true
+		mb := true
+
 		switch {
 		case c == 0:
-			sem <- true
-			go searchpairs(source.recs, match.recs, sem)
-			source.recs = source.recs[0:0] // don't release memory, searchpairs will do it
-			match.recs = match.recs[0:0]
-			ms := source.Next()
-			mb := match.Next()
-			if !(ms && mb) {
+			logger.Print("going in...")
+			limit <- true
+			go searchpairs(rcpy(source.recs), rcpy(match.recs), limit)
+			ms = source.Next()
+			mb = match.Next()
+			if !(ms || mb) {
 				break lp
 			}
 		case c < 0:
-			ms := source.Next()
+			ms = source.Next()
 			if !ms {
 				break lp
 			}
 		case c > 0:
-			mb := match.Next()
+			mb = match.Next()
 			if !mb {
 				break lp
 			}
+		}
+		if !(ms && mb) {
+			logger.Printf("ms=%v, mb=%v\n", ms, mb)
 		}
 	}
 
 	logger.Print("clearing channel")
 	for k := 0; k < concurrency; k++ {
-		sem <- true
+		limit <- true
 	}
 
 	close(rsltChan)

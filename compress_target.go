@@ -1,27 +1,22 @@
 // Convert the gene sequence file to a simple compressed format with
-// one sequence per row.  The format of each row is:
-// sequence<tab>identifier.
+// one sequence per row.  The identifiers are stored in a separate
+// file.
 
 package main
 
 import (
 	"bufio"
 	"bytes"
-	"encoding/binary"
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
 	logger *log.Logger
-
-	// Database mapping integer gene id (row number in sequence
-	// file) to full gene name.
-	db *leveldb.DB
 
 	config *utils.Config
 )
@@ -35,21 +30,28 @@ func targets(sourcefile string) {
 	}
 	defer inf.Close()
 
-	// Setup for writing the output
-	out, err := os.Create(config.GeneFileName)
+	// Setup for writing the sequence output
+	gid1, err := os.Create(config.GeneFileName)
 	if err != nil {
 		panic(err)
 	}
-	defer out.Close()
-	outw := snappy.NewBufferedWriter(out)
-	defer outw.Close()
+	defer gid1.Close()
+	seqout := snappy.NewBufferedWriter(gid1)
+	defer seqout.Close()
+
+	// Setup for writing the identifier output
+	gid2, err := os.Create(config.GeneIdFileName)
+	if err != nil {
+		panic(err)
+	}
+	defer gid2.Close()
+	idout := snappy.NewBufferedWriter(gid2)
+	defer idout.Close()
 
 	// Setup a scanner to read long lines
 	scanner := bufio.NewScanner(inf)
 	sbuf := make([]byte, 1024*1024)
 	scanner.Buffer(sbuf, 1024*1024)
-
-	ibuf := make([]byte, 4)
 
 	for lnum := 0; scanner.Scan(); lnum++ {
 
@@ -74,17 +76,26 @@ func targets(sourcefile string) {
 			}
 		}
 
-		binary.LittleEndian.PutUint32(ibuf, uint32(lnum))
-		err = db.Put(ibuf, nam, nil)
+		// Write the sequence
+		_, err = seqout.Write(seq)
+		if err != nil {
+			panic(err)
+		}
+		_, err = seqout.Write([]byte("\n"))
 		if err != nil {
 			panic(err)
 		}
 
-		_, err = outw.Write(seq)
+		// Write the gene id
+		_, err = idout.Write([]byte(fmt.Sprintf("%011d ", lnum)))
 		if err != nil {
 			panic(err)
 		}
-		_, err = outw.Write([]byte("\n"))
+		_, err = idout.Write(nam)
+		if err != nil {
+			panic(err)
+		}
+		_, err = idout.Write([]byte("\n"))
 		if err != nil {
 			panic(err)
 		}
@@ -114,19 +125,10 @@ func main() {
 	jsonfile := os.Args[1]
 	config = utils.ReadConfig(jsonfile)
 
-	sourcefile := os.Args[2]
+	genefile := os.Args[2]
 
 	setupLog()
 
-	os.RemoveAll(config.GeneIdDB)
-	var err error
-	db, err = leveldb.OpenFile(config.GeneIdDB, nil)
-	if err != nil {
-		logger.Print(err)
-		panic(err)
-	}
-	defer db.Close()
-
-	targets(sourcefile)
+	targets(genefile)
 	logger.Printf("Done")
 }

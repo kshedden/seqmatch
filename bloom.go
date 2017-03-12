@@ -14,6 +14,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/chmduquesne/rollinghash"
@@ -74,7 +75,9 @@ func buildBloom() {
 		hashes[j] = buzhash.NewFromByteArray(tables[j])
 	}
 
-	fname := strings.Replace(config.ReadFileName, ".fastq", "_sorted.txt.sz", 1)
+	d, f := path.Split(config.ReadFileName)
+	f = strings.Replace(f, ".fastq", "_sorted.txt.sz", 1)
+	fname := path.Join(d, "tmp", f)
 	fid, err := os.Open(fname)
 	if err != nil {
 		logger.Print(err)
@@ -264,7 +267,7 @@ func harvest(wtrs []io.Writer) {
 		n1, err1 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.mseq)))
 		n2, err2 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.left)))
 		n3, err3 := wtr.Write([]byte(fmt.Sprintf("%s\t", r.right)))
-		n4, err4 := wtr.Write([]byte(fmt.Sprintf("%d\t", r.tnum)))
+		n4, err4 := wtr.Write([]byte(fmt.Sprintf("%011d\t", r.tnum)))
 		n5, err5 := wtr.Write([]byte(fmt.Sprintf("%d", r.pos)))
 
 		for _, err := range []error{err1, err2, err3, err4, err5} {
@@ -308,8 +311,10 @@ func search() {
 	var wtrs []io.Writer
 	for k := 0; k < len(config.Windows); k++ {
 		q1 := config.Windows[k]
+		d, f := path.Split(config.ReadFileName)
 		s := fmt.Sprintf("_%d_%d_bmatch.txt.sz", q1, q1+config.WindowWidth)
-		outname := strings.Replace(config.ReadFileName, ".fastq", s, 1)
+		f = strings.Replace(f, ".fastq", s, 1)
+		outname := path.Join(d, "tmp", f)
 		out, err := os.Create(outname)
 		if err != nil {
 			logger.Print(err)

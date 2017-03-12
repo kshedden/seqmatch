@@ -16,6 +16,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/golang/snappy"
@@ -50,7 +51,9 @@ func main() {
 
 	// Setup input reader
 	fname := config.ReadFileName
-	fname = strings.Replace(fname, ".fastq", "_sorted.txt.sz", 1)
+	d, f := path.Split(fname)
+	f = strings.Replace(f, ".fastq", "_sorted.txt.sz", 1)
+	fname = path.Join(d, "tmp", f)
 	fid, err := os.Open(fname)
 	if err != nil {
 		panic(err)
@@ -69,7 +72,9 @@ func main() {
 		q1 := config.Windows[k]
 		q2 := q1 + config.WindowWidth
 		s := fmt.Sprintf("_win_%d_%d.txt.sz", q1, q2)
-		outfile := strings.Replace(config.ReadFileName, ".fastq", s, -1)
+		d, f := path.Split(config.ReadFileName)
+		f = strings.Replace(f, ".fastq", s, 1)
+		outfile := path.Join(d, "tmp", f)
 		gid, err := os.Create(outfile)
 		if err != nil {
 			panic(err)

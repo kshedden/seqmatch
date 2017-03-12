@@ -15,23 +15,24 @@ and the results will be complete in around 5 hours when using 10
 cores.
 
 The user provides a window width (for the exact matching window), and
-a list of left endpoint for these windows.  For example, if the window
-width is 30 and the left endpoints are 0, 15, 30, 45, and 60, then the
-windows are [0, 30), [15, 45), [30, 60), [45, 75), and [60, 90).  For
-a read to match a target, the sequence must match exactly in at least
-one of these windows.  The remainder of the sequence only needs to
-match so that the overall non-identity between the read and its
-mathing genome sequence is the value given by the parameter `PMiss`.
+a list of left endpoints for these windows.  For example, if the
+window width is 30 and the left endpoints are 0, 15, 30, 45, and 60,
+then the windows are [0, 30), [15, 45), [30, 60), [45, 75), and [60,
+90).  For a read to match a target, the sequence must match exactly in
+at least one of these windows.  The remainder of the sequence only
+needs to match so that the overall non-identity between the read and
+its mathing genome sequence is the value given by the parameter
+`PMiss`.
 
 __Using the tools__
 
 TODO: provide an install script that sets up the environment
 
 1. Build the target sequence database in the format required by the
-tool.  The pbs script "builddb.pbs" accomplishes this.  Edit the last
+tool.  The pbs script `builddb.pbs` accomplishes this.  Edit the last
 line of builddb.pbs to contain the full path to the target sequence
 data file, which must be an uncompressed text file in which each line
-has the format "id<tab>sequence<newline>".  This may take a few hours.
+has the format `id<tab>sequence<newline>`.  This may take a few hours.
 
 2. Edit the config.json file to contain the paths to the read, gene
 target, and gene id data.  Then run the run.pbs script to do all the

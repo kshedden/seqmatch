@@ -28,4 +28,6 @@ if [ -n "$PBS_O_WORKDIR" ]; then cd $PBS_O_WORKDIR; fi
 export LC_ALL=C
 export GOPATH=${HOME}/go
 export PATH=$PATH:${HOME}/go/bin
+export GOGC=20
 go run run.go config.json
+

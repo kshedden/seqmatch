@@ -4,9 +4,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/golang/snappy"
@@ -19,14 +19,11 @@ var (
 	logger *log.Logger
 )
 
-func source(sourcefile string) {
+func source() {
 
-	outfile := strings.Replace(sourcefile, ".fastq", ".txt.sz", -1)
-	inf, err := os.Open(sourcefile)
-	if err != nil {
-		panic(err)
-	}
-	defer inf.Close()
+	d, f := path.Split(config.ReadFileName)
+	f = strings.Replace(f, ".fastq", ".txt.sz", 1)
+	outfile := path.Join(d, "tmp", f)
 
 	out, err := os.Create(outfile)
 	if err != nil {
@@ -36,7 +33,7 @@ func source(sourcefile string) {
 	outw := snappy.NewBufferedWriter(out)
 	defer outw.Close()
 
-	ris := utils.NewReadInSeq(sourcefile, "")
+	ris := utils.NewReadInSeq(config.ReadFileName, "")
 
 	for lnum := 0; ris.Next(); lnum++ {
 
@@ -79,11 +76,8 @@ func source(sourcefile string) {
 }
 
 func setupLog() {
-	v := strings.Split(config.ReadFileName, "/")
-	b := v[len(v)-1]
-	v = strings.Split(b, ".")
-	b = v[0]
-	fid, err := os.Create(fmt.Sprintf("%s_compress_source.log", b))
+	b := strings.Replace(config.ReadFileName, ".fastq", "_compress_source.log", -1)
+	fid, err := os.Create(b)
 	if err != nil {
 		panic(err)
 	}
@@ -98,6 +92,6 @@ func main() {
 	config = utils.ReadConfig(os.Args[1])
 
 	setupLog()
-	source(config.ReadFileName)
+	source()
 	logger.Printf("Done")
 }
