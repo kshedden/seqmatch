@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	// Exact line length of input file
-	lw int = 150
+	// Needs to hold two reads
+	lw int = 300
 
 	concurrency = 100
 
@@ -37,9 +37,6 @@ var (
 	logger *log.Logger
 
 	config *utils.Config
-
-	// The required matching proportion (0 <= pmatch <= 1).
-	pmatch float64
 
 	// Pool of reusable byte slices
 	pool chan []byte
@@ -199,7 +196,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			logger.Printf("searching %d %d %s...", len(match), len(source), string(stag))
 		}
 
-		//mtag := mrec.fields[0]
+		mtag := mrec.fields[0]
 		mlft := mrec.fields[1]
 		mrgt := mrec.fields[2]
 		mgene := mrec.fields[3]
@@ -212,7 +209,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			srgt := srec.fields[2]
 			scnt := srec.fields[3]
 
-			nmiss := int((1 - pmatch) * float64(len(stag)+len(slft)+len(srgt)))
+			nmiss := int((1 - config.PMatch) * float64(len(stag)+len(slft)+len(srgt)))
 
 			// Gene ends before read would end, can't match.
 			if len(srgt) > len(mrgt) {
@@ -240,11 +237,16 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			bbuf.Write(slft)
 			bbuf.Write(stag)
 			bbuf.Write(srgt)
+			bbuf.Write([]byte("\t"))
+			bbuf.Write(mlft)
+			bbuf.Write(mtag)
+			bbuf.Write(mrgt)
 			x := fmt.Sprintf("\t%d\t%s\t%s\n", mposi-len(mlft), scnt, mgene)
 			bbuf.Write([]byte(x))
 			rsltChan <- bbuf.Bytes()
 
-			// one match is enough
+			// one match is enough for now (may need to
+			// make this configurable)
 			break
 		}
 	}
@@ -262,8 +264,12 @@ func searchpairs(source, match []*rec, limit chan bool) {
 }
 
 func setupLog(win int) {
-	s := fmt.Sprintf("_mergebloom_%d.log", win)
-	logname := strings.Replace(config.ReadFileName, ".fastq", s, 1)
+	d, f := path.Split(config.ReadFileName)
+	q1 := config.Windows[win]
+	q2 := q1 + config.WindowWidth
+	s := fmt.Sprintf("_mergebloom_%d_%d_%.0f.log", q1, q2, 100*config.PMatch)
+	f = strings.Replace(f, ".fastq", s, 1)
+	logname := path.Join(d, "tmp", f)
 
 	fid, err := os.Create(logname)
 	if err != nil {

@@ -28,4 +28,4 @@ if [ -n "$PBS_O_WORKDIR" ]; then cd $PBS_O_WORKDIR; fi
 export LC_ALL=C
 export GOPATH=${HOME}/go
 export PATH=$PATH:${HOME}/go/bin
-go run compress_target.go config.json /scratch/andjoh_fluxm/tealfurn/CSCAR/ALL_ABFVV_Genes_Derep.txt
+prep_target config.json /scratch/andjoh_fluxm/tealfurn/CSCAR/ALL_ABFVV_Genes_Derep.txt

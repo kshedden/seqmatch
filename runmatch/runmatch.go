@@ -29,7 +29,7 @@ var (
 
 func compresssource() {
 	logger.Printf("compresssource")
-	cmd := exec.Command("go", "run", "compress_source.go", jsonfile)
+	cmd := exec.Command("prep_reads", jsonfile)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -121,7 +121,7 @@ func sortsource() {
 
 func windowreads() {
 	logger.Printf("windowreads")
-	cmd := exec.Command("go", "run", "window_reads.go", jsonfile)
+	cmd := exec.Command("window_reads", jsonfile)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -175,7 +175,7 @@ func sortwindows() {
 }
 
 func bloom() {
-	cmd := exec.Command("go", "run", "bloom.go", jsonfile)
+	cmd := exec.Command("bloom", jsonfile)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -233,7 +233,7 @@ func sortbloom() {
 func mergebloom() {
 	var cmds []*exec.Cmd
 	for k, _ := range config.Windows {
-		cmd := exec.Command("go", "run", "merge_bloom.go", jsonfile, fmt.Sprintf("%d", k))
+		cmd := exec.Command("merge_bloom", jsonfile, fmt.Sprintf("%d", k))
 		cmd.Env = os.Environ()
 		cmd.Stderr = os.Stderr
 		err := cmd.Start()
@@ -264,7 +264,8 @@ func combinewindows() {
 
 	// The sorted results go to disk
 	d, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", "_matches.txt.sz", 1)
+	s := fmt.Sprintf("_%.0f_matches.txt.sz", 100*config.PMatch)
+	f = strings.Replace(f, ".fastq", s, 1)
 	outname := path.Join(d, "tmp", f)
 	c1 := exec.Command("sztool", "-c", "-", outname)
 	c1.Env = os.Environ()
@@ -319,18 +320,20 @@ func sortbygeneid() {
 
 	logger.Printf("sortbygeneid starting")
 	d, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", "_matches.txt.sz", 1)
+	s := fmt.Sprintf("_%.0f_matches.txt.sz", 100*config.PMatch)
+	f = strings.Replace(f, ".fastq", s, 1)
 	inname := path.Join(d, "tmp", f)
 
 	d, f = path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", "_matches_sg.txt.sz", 1)
+	s = fmt.Sprintf("_%.0f_matches_sg.txt", 100*config.PMatch)
+	f = strings.Replace(f, ".fastq", s, 1)
 	outname := path.Join(d, "tmp", f)
 
 	// Sort by gene number
 	cmd1 := exec.Command("sztool", "-d", inname)
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
-	cmd2 := exec.Command("sort", "-k 4", "-")
+	cmd2 := exec.Command("sort", "-k 5", "-")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	var err error
@@ -368,30 +371,39 @@ func joingenenames() {
 	logger.Printf("joingenenames starting")
 
 	d, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", "_matches_sg.txt.sz", 1)
+	s := fmt.Sprintf("_%.0f_matches_sg.txt", 100*config.PMatch)
+	f = strings.Replace(f, ".fastq", s, 1)
 	inname := path.Join(d, "tmp", f)
 	pname1 := pipefromsz(inname)
 	pname2 := pipefromsz(config.GeneIdFileName)
 
-	cmd1 := exec.Command("join", pname1, pname2, "-1", "4", "-2", "1")
+	cmd1 := exec.Command("join", pname1, pname2, "-1", "5", "-2", "1")
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
 
-	outname := strings.Replace(config.ReadFileName, ".fastq", "_matches.txt", 1)
+	// Remove the internal sequence id
+	cmd2 := exec.Command("cut", "-d' '", "-f", "2-6", "-")
+	cmd2.Env = os.Environ()
+	cmd2.Stderr = os.Stderr
+	pi, err := cmd1.StdoutPipe()
+	cmd2.Stdin = pi
+
+	s = fmt.Sprintf("_%.0f_matches.txt", 100*config.PMatch)
+	outname := strings.Replace(config.ReadFileName, ".fastq", s, 1)
 	fid, err := os.Create(outname)
 	if err != nil {
 		panic(err)
 	}
 	defer fid.Close()
 	w := bufio.NewWriter(fid)
-	pi, err := cmd1.StdoutPipe()
+	pi2, err := cmd2.StdoutPipe()
 	if err != nil {
 		panic(err)
 	}
-	go io.Copy(w, pi)
+	go io.Copy(w, pi2)
 	defer w.Flush()
 
-	cmds := []*exec.Cmd{cmd1}
+	cmds := []*exec.Cmd{cmd1, cmd2}
 
 	for _, c := range cmds {
 		err := c.Start()
@@ -427,7 +439,9 @@ func nonmatching() {
 }
 
 func setupLog() {
-	logname := strings.Replace(config.ReadFileName, ".fastq", "_run.log", 1)
+	d, f := path.Split(config.ReadFileName)
+	f = strings.Replace(f, ".fastq", "_run.log", 1)
+	logname := path.Join(d, "tmp", f)
 	fid, err := os.Create(logname)
 	if err != nil {
 		logger.Print(err)
@@ -465,12 +479,12 @@ func main() {
 	pipedir = path.Join(tmpdir, "pipes")
 	os.Mkdir(pipedir, 0755) // ignore the error if the directory exists
 
-	compresssource()
+	/*compresssource()
 	sortsource()
 	windowreads()
 	sortwindows()
 	bloom()
-	sortbloom()
+	sortbloom()*/
 	mergebloom()
 	combinewindows()
 	sortbygeneid()

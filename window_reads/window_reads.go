@@ -30,9 +30,10 @@ var (
 )
 
 func setupLog() {
-
-	fname := strings.Replace(config.ReadFileName, ".fastq", "_window_reads.log", 1)
-	fid, err := os.Create(fname)
+	d, f := path.Split(config.ReadFileName)
+	f = strings.Replace(f, ".fastq", "_window_reads.log", 1)
+	logname := path.Join(d, "tmp", f)
+	fid, err := os.Create(logname)
 	if err != nil {
 		panic(err)
 	}
