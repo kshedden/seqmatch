@@ -1,7 +1,6 @@
 #!/bin/sh
 
 module load go
-go get -u github.com/chmduquesne/rollinghash/buzhash
 go get -u github.com/kshedden/seqmatch/prep_reads
 go get -u github.com/kshedden/seqmatch/prep_target
 go get -u github.com/kshedden/seqmatch/window_reads

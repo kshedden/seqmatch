@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/chmduquesne/rollinghash"
-	"github.com/chmduquesne/rollinghash/buzhash"
+	"github.com/chmduquesne/rollinghash/buzhash32"
 	"github.com/golang-collections/go-datastructures/bitarray"
 	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
