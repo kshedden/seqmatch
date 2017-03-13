@@ -325,7 +325,7 @@ func sortbygeneid() {
 	inname := path.Join(d, "tmp", f)
 
 	d, f = path.Split(config.ReadFileName)
-	s = fmt.Sprintf("_%.0f_matches_sg.txt", 100*config.PMatch)
+	s = fmt.Sprintf("_%.0f_matches_sg.txt.sz", 100*config.PMatch)
 	f = strings.Replace(f, ".fastq", s, 1)
 	outname := path.Join(d, "tmp", f)
 
@@ -486,8 +486,8 @@ func main() {
 	bloom()
 	sortbloom()
 	mergebloom()
-	combinewindows()
-	sortbygeneid()*/
+	combinewindows()*/
+	sortbygeneid()
 	joingenenames()
 	//nonmatching()
 }
