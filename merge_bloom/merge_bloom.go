@@ -217,9 +217,9 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			}
 
 			// Count differences
-			m := len(srgt)
+			mk := len(srgt)
 			nx := cdiff(mlft, slft)
-			nx += cdiff(mrgt[0:m], srgt[0:m])
+			nx += cdiff(mrgt[0:mk], srgt)
 			if nx > nmiss {
 				continue
 			}
@@ -240,7 +240,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			bbuf.Write([]byte("\t"))
 			bbuf.Write(mlft)
 			bbuf.Write(mtag)
-			bbuf.Write(mrgt)
+			bbuf.Write(mrgt[0:mk])
 			x := fmt.Sprintf("\t%d\t%s\t%s\n", mposi-len(mlft), scnt, mgene)
 			bbuf.Write([]byte(x))
 			rsltChan <- bbuf.Bytes()
