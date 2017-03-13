@@ -8,5 +8,5 @@
     "BloomSize": 4000000000,
     "NumHash": 20,
     "MinDinuc": 5,
-    "PMatch": 1.0
+    "PMatch": 0.9
 }

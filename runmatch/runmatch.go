@@ -422,22 +422,6 @@ func joingenenames() {
 	logger.Printf("joingenenames done")
 }
 
-func nonmatching() {
-
-	a1 := fmt.Sprintf("<(sztool -d %s)",
-		strings.Replace(config.ReadFileName, ".fastq", "_sorted.txt.sz", 1))
-	a2 := fmt.Sprintf("<(cut -k1 %s | sort -u)",
-		strings.Replace(config.ReadFileName, ".fastq", "_matches.txt", 1))
-	outname := strings.Replace(config.ReadFileName, ".fastq", "_nomatch.txt", 1)
-	cmd := exec.Command("comm", "-23", a1, a2, ">", outname)
-	cmd.Env = os.Environ()
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	if err != nil {
-		panic(err)
-	}
-}
-
 func setupLog() {
 	d, f := path.Split(config.ReadFileName)
 	f = strings.Replace(f, ".fastq", "_run.log", 1)
@@ -479,7 +463,7 @@ func main() {
 	pipedir = path.Join(tmpdir, "pipes")
 	os.Mkdir(pipedir, 0755) // ignore the error if the directory exists
 
-	/*compresssource()
+	compresssource()
 	sortsource()
 	windowreads()
 	sortwindows()
@@ -487,7 +471,6 @@ func main() {
 	sortbloom()
 	mergebloom()
 	combinewindows()
-	sortbygeneid()*/
+	sortbygeneid()
 	joingenenames()
-	//nonmatching()
 }
