@@ -382,7 +382,7 @@ func joingenenames() {
 	cmd1.Stderr = os.Stderr
 
 	// Remove the internal sequence id
-	cmd2 := exec.Command("cut", "-d' '", "-f", "2-6", "-")
+	cmd2 := exec.Command("cut", "-d", "' '", "-f", "2-6", "-")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	pi, err := cmd1.StdoutPipe()
@@ -484,10 +484,10 @@ func main() {
 	windowreads()
 	sortwindows()
 	bloom()
-	sortbloom()*/
+	sortbloom()
 	mergebloom()
 	combinewindows()
-	sortbygeneid()
+	sortbygeneid()*/
 	joingenenames()
 	//nonmatching()
 }
