@@ -377,12 +377,12 @@ func joingenenames() {
 	pname1 := pipefromsz(inname)
 	pname2 := pipefromsz(config.GeneIdFileName)
 
-	cmd1 := exec.Command("join", "-d\" \"", pname1, pname2, "-1", "5", "-2", "1")
+	cmd1 := exec.Command("join", pname1, pname2, "-1", "5", "-2", "1")
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
 
 	// Remove the internal sequence id
-	cmd2 := exec.Command("cut", "-f", "2-6", "-")
+	cmd2 := exec.Command("cut", "-d\" \"", "-f", "2-6", "-")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	pi, err := cmd1.StdoutPipe()
