@@ -371,7 +371,7 @@ func joingenenames() {
 	logger.Printf("joingenenames starting")
 
 	d, f := path.Split(config.ReadFileName)
-	s := fmt.Sprintf("_%.0f_matches_sg.txt", 100*config.PMatch)
+	s := fmt.Sprintf("_%.0f_matches_sg.txt.sz", 100*config.PMatch)
 	f = strings.Replace(f, ".fastq", s, 1)
 	inname := path.Join(d, "tmp", f)
 	pname1 := pipefromsz(inname)
@@ -463,7 +463,7 @@ func main() {
 	pipedir = path.Join(tmpdir, "pipes")
 	os.Mkdir(pipedir, 0755) // ignore the error if the directory exists
 
-	compresssource()
+	/*compresssource()
 	sortsource()
 	windowreads()
 	sortwindows()
@@ -471,6 +471,6 @@ func main() {
 	sortbloom()
 	mergebloom()
 	combinewindows()
-	sortbygeneid()
+	sortbygeneid()*/
 	joingenenames()
 }
