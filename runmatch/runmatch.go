@@ -463,7 +463,7 @@ func main() {
 	pipedir = path.Join(tmpdir, "pipes")
 	os.Mkdir(pipedir, 0755) // ignore the error if the directory exists
 
-	/*compresssource()
+	compresssource()
 	sortsource()
 	windowreads()
 	sortwindows()
@@ -471,6 +471,6 @@ func main() {
 	sortbloom()
 	mergebloom()
 	combinewindows()
-	sortbygeneid()*/
+	sortbygeneid()
 	joingenenames()
 }
