@@ -194,7 +194,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 	}
 
 	var stag []byte
-	for jm, mrec := range match {
+	for _, mrec := range match {
 
 		mtag := mrec.fields[0]
 		mlft := mrec.fields[1]
