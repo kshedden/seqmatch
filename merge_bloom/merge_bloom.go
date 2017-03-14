@@ -189,12 +189,12 @@ func getbuf() []byte {
 
 func searchpairs(source, match []*rec, limit chan bool) {
 
-	var stag []byte
-	for jm, mrec := range match {
+	if len(match)*len(source) > 10000 {
+		logger.Printf("searching %d %d ...", len(match), len(source))
+	}
 
-		if jm == 0 && len(match)*len(source) > 10000 {
-			logger.Printf("searching %d %d %s...", len(match), len(source), string(stag))
-		}
+	var stag []byte
+	for _, mrec := range match {
 
 		mtag := mrec.fields[0]
 		mlft := mrec.fields[1]
@@ -250,8 +250,9 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			break
 		}
 	}
+
 	if len(match)*len(source) > 10000 {
-		logger.Printf("done")
+		logger.Printf("done with search")
 	}
 
 	for _, x := range source {
@@ -380,14 +381,19 @@ func main() {
 		}
 	}()
 
-	rsltChan = make(chan []byte, 100)
+	rsltChan = make(chan []byte, 5*concurrency)
 	limit := make(chan bool, concurrency)
 
 lp:
 	for ii := 0; ; ii++ {
 
 		if profile && ii > 100000 {
+			logger.Printf("Breaking early for profile run")
 			break
+		}
+
+		if ii%100000 == 0 {
+			logger.Printf("%d", ii)
 		}
 
 		s := source.recs[0].fields[0]
@@ -399,7 +405,6 @@ lp:
 
 		switch {
 		case c == 0:
-			logger.Print("going in...")
 			limit <- true
 			go searchpairs(rcpy(source.recs), rcpy(match.recs), limit)
 			ms = source.Next()
@@ -419,6 +424,7 @@ lp:
 			}
 		}
 		if !(ms && mb) {
+			// One of the files is done
 			logger.Printf("ms=%v, mb=%v\n", ms, mb)
 		}
 	}
