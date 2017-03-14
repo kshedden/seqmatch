@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ func compresssource() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Printf("compresssource done")
 }
 
 func pipename() string {
@@ -116,7 +118,7 @@ func sortsource() {
 			panic(err)
 		}
 	}
-	logger.Printf("Finished sortsource")
+	logger.Printf("sortsource done")
 }
 
 func windowreads() {
@@ -128,10 +130,12 @@ func windowreads() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Printf("windowreads done")
 }
 
 func sortwindows() {
 
+	logger.Printf("staring sortwindows")
 	var cmds []*exec.Cmd
 
 	for k := 0; k < len(config.Windows); k++ {
@@ -172,9 +176,12 @@ func sortwindows() {
 			panic(err)
 		}
 	}
+
+	logger.Printf("sortwindows done")
 }
 
 func bloom() {
+	logger.Printf("starting bloom")
 	cmd := exec.Command("bloom", jsonfile)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
@@ -182,10 +189,12 @@ func bloom() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Printf("bloom done")
 }
 
 func sortbloom() {
 
+	logger.Printf("starting sortbloom")
 	var cmds []*exec.Cmd
 
 	for _, q1 := range config.Windows {
@@ -228,9 +237,12 @@ func sortbloom() {
 			panic(err)
 		}
 	}
+
+	logger.Printf("sortbloom done")
 }
 
 func mergebloom() {
+	logger.Printf("starting mergebloom")
 	var cmds []*exec.Cmd
 	for k, _ := range config.Windows {
 		cmd := exec.Command("merge_bloom", jsonfile, fmt.Sprintf("%d", k))
@@ -249,6 +261,7 @@ func mergebloom() {
 			panic(err)
 		}
 	}
+	logger.Printf("mergebloom done")
 }
 
 func combinewindows() {
@@ -318,7 +331,7 @@ func combinewindows() {
 
 func sortbygeneid() {
 
-	logger.Printf("sortbygeneid starting")
+	logger.Printf("starting sortbygeneid")
 	d, f := path.Split(config.ReadFileName)
 	s := fmt.Sprintf("_%.0f_matches.txt.sz", 100*config.PMatch)
 	f = strings.Replace(f, ".fastq", s, 1)
@@ -368,7 +381,7 @@ func sortbygeneid() {
 
 func joingenenames() {
 
-	logger.Printf("joingenenames starting")
+	logger.Printf("starting joingenenames")
 
 	d, f := path.Split(config.ReadFileName)
 	s := fmt.Sprintf("_%.0f_matches_sg.txt.sz", 100*config.PMatch)
@@ -436,7 +449,7 @@ func setupLog() {
 
 func main() {
 
-	if len(os.Args) != 2 {
+	if len(os.Args) != 3 {
 		panic("wrong number of arguments")
 	}
 
@@ -448,6 +461,12 @@ func main() {
 
 	jsonfile = os.Args[1]
 	config = utils.ReadConfig(jsonfile)
+
+	startpoint, err := strconv.Atoi(os.Args[2])
+	if err != nil {
+		print("can't determine starting point")
+		panic(err)
+	}
 
 	if !strings.HasSuffix(config.ReadFileName, ".fastq") {
 		panic("Invalid read file")
@@ -463,14 +482,43 @@ func main() {
 	pipedir = path.Join(tmpdir, "pipes")
 	os.Mkdir(pipedir, 0755) // ignore the error if the directory exists
 
-	compresssource()
-	sortsource()
-	windowreads()
-	sortwindows()
-	bloom()
-	sortbloom()
-	mergebloom()
-	combinewindows()
-	sortbygeneid()
-	joingenenames()
+	if startpoint >= 0 {
+		compresssource()
+	}
+
+	if startpoint >= 1 {
+		sortsource()
+	}
+
+	if startpoint >= 2 {
+		windowreads()
+	}
+
+	if startpoint >= 3 {
+		sortwindows()
+	}
+
+	if startpoint >= 4 {
+		bloom()
+	}
+
+	if startpoint >= 5 {
+		sortbloom()
+	}
+
+	if startpoint >= 6 {
+		mergebloom()
+	}
+
+	if startpoint >= 7 {
+		combinewindows()
+	}
+
+	if startpoint >= 8 {
+		sortbygeneid()
+	}
+
+	if startpoint >= 9 {
+		joingenenames()
+	}
 }
