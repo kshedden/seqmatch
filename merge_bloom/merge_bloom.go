@@ -190,7 +190,7 @@ func getbuf() []byte {
 func searchpairs(source, match []*rec, limit chan bool) {
 
 	if len(match)*len(source) > 10000 {
-		logger.Printf("searching %d %d %s...", len(match), len(source))
+		logger.Printf("searching %d %d ...", len(match), len(source))
 	}
 
 	var stag []byte
@@ -252,7 +252,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 	}
 
 	if len(match)*len(source) > 10000 {
-		logger.Printf("done")
+		logger.Printf("done with search")
 	}
 
 	for _, x := range source {
@@ -381,7 +381,7 @@ func main() {
 		}
 	}()
 
-	rsltChan = make(chan []byte, 100)
+	rsltChan = make(chan []byte, 5*concurrency)
 	limit := make(chan bool, concurrency)
 
 lp:
