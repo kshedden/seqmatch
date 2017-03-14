@@ -29,7 +29,7 @@ var (
 )
 
 func compresssource() {
-	logger.Printf("compresssource")
+	logger.Printf("starting compresssource")
 	cmd := exec.Command("prep_reads", jsonfile)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
@@ -73,7 +73,7 @@ func pipefromsz(fname string) string {
 
 func sortsource() {
 
-	logger.Printf("sortsource")
+	logger.Printf("starting sortsource")
 	fname := strings.Replace(basename, ".fastq", ".txt.sz", 1)
 	fname = path.Join(tmpdir, fname)
 	pname1 := pipefromsz(fname)
@@ -122,7 +122,7 @@ func sortsource() {
 }
 
 func windowreads() {
-	logger.Printf("windowreads")
+	logger.Printf("starting windowreads")
 	cmd := exec.Command("window_reads", jsonfile)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
@@ -135,7 +135,7 @@ func windowreads() {
 
 func sortwindows() {
 
-	logger.Printf("staring sortwindows")
+	logger.Printf("starting sortwindows")
 	var cmds []*exec.Cmd
 
 	for k := 0; k < len(config.Windows); k++ {
