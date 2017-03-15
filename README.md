@@ -58,12 +58,12 @@ __Configurable parameters__
 
 Some parameters can be configured in the `config.json` file:
 
-__MinDinuc__: The minum number of distinct dinucleotides that must be
+* MinDinuc: The minum number of distinct dinucleotides that must be
 present in a read (or it is dropped).  This eliminates uninformative
 matches that take a lot of space and time to enumerate.
 
-__PMatch__: The proportion (between 0 and 1) of bases in a gene
-sequence that need to match the read.
+* PMatch: The proportion (between 0 and 1) of bases in a gene sequence
+that need to match the read.
 
 __Next steps__
 
@@ -79,7 +79,7 @@ Count the distinct genes that successfully match a read:
 awk '{print $5}' PRT_NOV_15_02_100_matches.txt | sort -u | wc -l
 ```
 
-Find all the reads that did not match anything:
+Find all the reads that do not match anything:
 
 ```
 rm -f tmp[1-2]

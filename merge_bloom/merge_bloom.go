@@ -1,8 +1,8 @@
 // Merge the sorted match results from the Bloom filter with the
-// sorted read sequence file (which also contains counts).  Doing this
-// achieves two goals: false positives from the Bloom filter are
-// eliminated, and the counts from the sequence file are incorporated
-// into the match file.
+// sorted read sequences.  Doing this achieves two goals: false
+// positives from the Bloom filter are eliminated, and the count
+// information from the sequence file is incorporated into the match
+// file.
 
 package main
 
@@ -84,18 +84,39 @@ func (r *rec) setfields() {
 	r.fields = bytes.Split(r.buf, []byte("\t"))
 }
 
+// breader iterates through a set of sequences, combining blocks of
+// contiguous records with the same window sequence.  A breader can be
+// used to iterate through either the match or the raw read data.  The
+// input sequence windows must be sorted.
 type breader struct {
+
+	// The input sequences
 	scanner *bufio.Scanner
-	recs    []*rec
-	stash   *rec
-	done    bool
-	lnum    int
-	name    string
+
+	// The caller can access the block data through this field
+	recs []*rec
+
+	// If we read past the end of a block, put it here so it can
+	// be included in the next iteration.
+	stash *rec
+
+	// True if all sequences have been read.  At this point, the
+	// recs field will continue to hold the final block of
+	// sequences.
+	done bool
+
+	// The current line number in the input file
+	lnum int
+
+	// The ame of the source of sequences (either "match" or
+	// "source").
+	name string
 
 	// Used to confirm that file is sorted
 	last *rec
 }
 
+// Next advances a breader to the next block.
 func (b *breader) Next() bool {
 
 	if b.done {
@@ -232,9 +253,9 @@ func searchpairs(source, match []*rec, limit chan bool) {
 				panic(err)
 			}
 
+			// Found a match, pass to output
 			buf := getbuf()
 			bbuf := bytes.NewBuffer(buf)
-
 			bbuf.Write(slft)
 			bbuf.Write(stag)
 			bbuf.Write(srgt)
@@ -280,6 +301,7 @@ func setupLog(win int) {
 	logger = log.New(fid, "", log.Lshortfile)
 }
 
+// rcpy deeply copies its argument.
 func rcpy(r []*rec) []*rec {
 	x := make([]*rec, len(r))
 	for j, _ := range x {
@@ -405,6 +427,7 @@ lp:
 
 		switch {
 		case c == 0:
+			// Window sequences match, check if it is a real match.
 			limit <- true
 			go searchpairs(rcpy(source.recs), rcpy(match.recs), limit)
 			ms = source.Next()
@@ -413,11 +436,13 @@ lp:
 				break lp
 			}
 		case c < 0:
+			// The source sequence is behind, move it up.
 			ms = source.Next()
 			if !ms {
 				break lp
 			}
 		case c > 0:
+			// The match sequence is behind, move it up.
 			mb = match.Next()
 			if !mb {
 				break lp
