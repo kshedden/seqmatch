@@ -16,16 +16,21 @@ install.sh`.
 
 * Edit the `config.json` file to contain the proper paths for the read
   and gene files, and adjust the run parameters if desired.  Then run
-  `qsub run.pbs` to fully process one read file.
+  `qsub run.pbs` to fully process one read file.  This currently takes
+  around five hours (for aound 90M distinct reads and 60M distinct
+  genes, using 20 hashes, and PMatch around 0.9-1).
 
 __Goal and approach__
 
 The goal is to find all approximate matches from a set of reads into a
 target sequence database.  To make the matching tractable and
-scalable, we require a window within the read to match perfectly.  The
+scalable, we require a window within the read to match exactly.  The
 remainder of the read can match to a given level of accuracy
 (e.g. 90%).  Results for multiple exact match windows can be
-calculated in parallel and pooled.
+calculated in parallel and pooled, so the overall query can be stated
+as: "approximately find all genes that match a length `w` subsequence
+of a read exactly, and that match the overall read in at least `p`
+percent of the positions".
 
 The approach uses [Bloom
 filtering](https://en.wikipedia.org/wiki/Bloom_filter), [rolling
