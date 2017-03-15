@@ -45,3 +45,64 @@ at least one of these windows.  The remainder of the sequence needs to
 match such that the overall identity between the read and its matching
 genome sequence is the value given by the parameter `PMatch`.
 
+Notes:
+
+* Only the first encountered matching gene sequence for each read is
+  returned.  We could return all of the matches, but this dramatically
+  blows up the time/file size since it is dominated by a small number
+  of low-information reads that match many targets.  We could also
+  attempt to return only the best match, but that is not implemented
+  yet.
+
+__Configurable parameters__
+
+Some parameters can be configured in the `config.json` file:
+
+__MinDinuc__: The minum number of distinct dinucleotides that must be
+present in a read (or it is dropped).  This eliminates uninformative
+matches that take a lot of space and time to enumerate.
+
+__PMatch__: The proportion (between 0 and 1) of bases in a gene
+sequence that need to match the read.
+
+__Next steps__
+
+Count the distinct reads that successfully match into the genes:
+
+```
+awk '{print $1}' PRT_NOV_15_02_100_matches.txt | sort -u | wc -l
+```
+
+Count the distinct genes that successfully match a read:
+
+```
+awk '{print $5}' PRT_NOV_15_02_100_matches.txt | sort -u | wc -l
+```
+
+Find all the reads that did not match anything:
+
+```
+rm -f tmp[1-2]
+mkfifo tmp1
+sztool -d tmp/PRT_NOV_15_02_sorted.txt.sz | awk '{print $2}' | sort -u > tmp1 &
+mkfifo tmp2
+awk '{print $1}' PRT_NOV_15_02_100_matches.txt | sort -u > tmp2 &
+comm -23 tmp1 tmp2 > nomatches.txt
+rm -f tmp1 tmp2
+```
+
+Crude check that a claimed match is correct (checking the read sequence):
+
+```
+rm -f tmp3
+mkfifo tmp3
+sztool -d tmp/PRT_NOV_15_02_sorted.txt.sz > tmp3 &
+grep -e $(awk '{print $1}' PRT_NOV_15_02_100_matches.txt | head -n100 | tail -n1) tmp3 > c1
+rm -f tmp3
+```
+
+Crude check that a claimed match is correct (checking the gene sequence):
+
+```
+grep -e $(awk '{print $2}' PRT_NOV_15_02_100_matches.txt | head -n1) ALL_ABFVV_Genes_Derep.txt > c2
+```

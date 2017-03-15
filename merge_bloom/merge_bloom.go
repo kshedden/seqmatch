@@ -189,6 +189,7 @@ func getbuf() []byte {
 
 func searchpairs(source, match []*rec, limit chan bool) {
 
+	defer func() { <-limit }()
 	if len(match)*len(source) > 10000 {
 		logger.Printf("searching %d %d ...", len(match), len(source))
 	}
@@ -261,7 +262,6 @@ func searchpairs(source, match []*rec, limit chan bool) {
 	for _, x := range match {
 		x.release()
 	}
-	<-limit
 }
 
 func setupLog(win int) {
