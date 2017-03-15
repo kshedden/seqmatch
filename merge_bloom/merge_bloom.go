@@ -398,6 +398,9 @@ func main() {
 	// Harvest the results
 	go func() {
 		for r := range rsltChan {
+			if len(rsltChan) > cap(rsltChan)-10 {
+				logger.Printf("len(rsltChan) = %d", len(rsltChan))
+			}
 			out.Write(r)
 			putbuf(r)
 		}
