@@ -4,13 +4,15 @@ __Quick start__
 * Download the `install.sh`, `run.pbs`, `prep_target.pbs`, and
 `config.json` files from [here](https://github.com/kshedden/seqmatch).
 
-
 * At the shell prompt in Flux, type `module load go`, then `/bin/sh
 install.sh`.
 
+* Edit the -M and -A parameters in the `prep_target.pbs` and `run.pbs`
+  scripts to contain your email address and Flux account.
+
 * Edit the file name in `prep_target.pbs` to point to the gene data
   file.  Then type `qsub prep_target.pbs` and wait for this script to
-  complete before proceeding (it takes around one hour).  Note that
+  complete before proceeding (it takes under one hour).  Note that
   this script only needs to be run when the gene database changes, it
   does not utilize the sequencing read files at all.
 
