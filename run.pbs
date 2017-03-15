@@ -29,9 +29,4 @@ export LC_ALL=C
 export GOPATH=${HOME}/go
 export PATH=$PATH:${HOME}/go/bin
 export GOGC=20
-<<<<<<< HEAD
 runmatch config.json 0
-=======
-runmatch config.json 6
->>>>>>> 72c03ec26fc8876a6d2c1beade6cd49a93d959ea
-
