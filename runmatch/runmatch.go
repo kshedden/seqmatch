@@ -477,10 +477,11 @@ func main() {
 	// Create the directory for all temporary files, if needed
 	var d string
 	d, basename = path.Split(config.ReadFileName)
-	tmpdir = path.Join(d, "tmp")
-	os.Mkdir(tmpdir, 0755) // ignore the error if the directory exists
-	pipedir = path.Join(tmpdir, "pipes")
-	os.Mkdir(pipedir, 0755) // ignore the error if the directory exists
+	tmpdir = path.Join(d, "tmp", "pipes")
+	err = os.MkdirAll(tmpdir, 0755) // ignore the error if the directory exists
+	if err != nil {
+		panic(err)
+	}
 
 	if startpoint <= 0 {
 		compresssource()
