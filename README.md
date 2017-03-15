@@ -23,10 +23,10 @@ install.sh`.
 __Goal and approach__
 
 The goal is to find all approximate matches from a set of reads into a
-target sequence database.  To make the matching tractable and
-scalable, we require a window within the read to match exactly.  The
-remainder of the read can match to a given level of accuracy
-(e.g. 90%).  Results for multiple exact match windows can be
+gene sequence database.  To make the matching tractable and scalable,
+we require a window within a read to match exactly for it to count as
+a match.  The remainder of the read can match to a given level of
+accuracy (e.g. 90%).  Results for multiple exact match windows can be
 calculated in parallel and pooled, so the overall query can be stated
 as: "approximately find all genes that match a length `w` subsequence
 of a read exactly, and that match the overall read in at least `p`
@@ -48,16 +48,16 @@ then the windows are [0, 30), [15, 45), [30, 60), [45, 75), and [60,
 90).  For a read to match a target, the sequence must match exactly in
 at least one of these windows.  The remainder of the sequence needs to
 match such that the overall identity between the read and its matching
-genome sequence is the value given by the parameter `PMatch`.
+genome sequence exceeds the value given by the parameter `PMatch`.
 
 Notes:
 
 * Only the first encountered matching gene sequence for each read is
   returned.  We could return all of the matches, but this dramatically
-  blows up the time/file size since it is dominated by a small number
-  of low-information reads that match many targets.  We could also
-  attempt to return only the best match, but that is not implemented
-  yet.
+  blows up the run time/file size, since it is dominated by a small
+  number of low-information reads that match many targets.  We could
+  also attempt to return only the best match, or a bounded number of
+  matches, but these are not implemented yet.
 
 __Configurable parameters__
 
