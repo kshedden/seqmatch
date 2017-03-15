@@ -108,6 +108,7 @@ awk '{print $5}' PRT_NOV_15_02_100_matches.txt | sort -u | wc -l
 Find all the reads that do not match anything:
 
 ```
+export LC_ALL=C
 rm -f tmp[1-2]
 mkfifo tmp1
 sztool -d tmp/PRT_NOV_15_02_sorted.txt.sz | awk '{print $2}' | sort -u > tmp1 &
