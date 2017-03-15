@@ -58,12 +58,33 @@ __Configurable parameters__
 
 Some parameters can be configured in the `config.json` file:
 
+* ReadFileName: A file containing sequencing reads in fastq format.
+
+* GeneFileName: A file containing gene sequences.  This can be
+  produced by the `prep_target` script, or by other means.  It is a
+  Snappy-compressed text file in which each row contains a gene
+  sequence (and nothing else).
+
+* GeneIdFile: A file containing gene id's.  This is produced by the
+  `prep_target` script, or can be produced by some other means.  Each
+  row contains a gene identifier.  The rows align 1-1 with the rows of
+  `GeneFileName`.  The file should be compressed with Snappy.
+
+* WindowWidth: The width of a window that must match exactly.
+
+* Windows: The left edges of windows, one of which must match exactly.
+
 * MinDinuc: The minum number of distinct dinucleotides that must be
 present in a read (or it is dropped).  This eliminates uninformative
 matches that take a lot of space and time to enumerate.
 
 * PMatch: The proportion (between 0 and 1) of bases in a gene sequence
 that need to match the read.
+
+* BloomSize: The number of bits in the Bloom filter.  Should be around
+  two times greater than `NumHash` times the number of gene sequences.
+
+* NumHash: The number of hashes used in the Bloom filter.
 
 __Next steps__
 
