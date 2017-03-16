@@ -480,6 +480,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	tmpdir = path.Join(d, "tmp")
 	setupLog()
 
 	if startpoint <= 0 {
