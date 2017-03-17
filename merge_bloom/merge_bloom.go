@@ -47,6 +47,8 @@ var (
 
 	// Pass results to driver then write to disk
 	rsltChan chan []byte
+
+	alldone chan bool
 )
 
 type rec struct {
@@ -395,6 +397,10 @@ func main() {
 	source.Next()
 	match.Next()
 
+	rsltChan = make(chan []byte, 5*concurrency)
+	limit := make(chan bool, concurrency)
+	alldone = make(chan bool)
+
 	// Harvest the results
 	go func() {
 		for r := range rsltChan {
@@ -407,10 +413,8 @@ func main() {
 			}
 			putbuf(r)
 		}
+		alldone <- true
 	}()
-
-	rsltChan = make(chan []byte, 5*concurrency)
-	limit := make(chan bool, concurrency)
 
 lp:
 	for ii := 0; ; ii++ {
@@ -466,6 +470,7 @@ lp:
 	}
 
 	close(rsltChan)
+	<-alldone
 
 	logger.Print("done")
 }
