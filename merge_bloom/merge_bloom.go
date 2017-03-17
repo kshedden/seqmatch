@@ -401,7 +401,10 @@ func main() {
 			if len(rsltChan) > cap(rsltChan)-10 {
 				logger.Printf("len(rsltChan) = %d", len(rsltChan))
 			}
-			out.Write(r)
+			_, err := out.Write(r)
+			if err != nil {
+				panic(err)
+			}
 			putbuf(r)
 		}
 	}()
