@@ -404,9 +404,6 @@ func main() {
 	// Harvest the results
 	go func() {
 		for r := range rsltChan {
-			if len(rsltChan) > cap(rsltChan)-10 {
-				logger.Printf("len(rsltChan) = %d", len(rsltChan))
-			}
 			_, err := out.Write(r)
 			if err != nil {
 				panic(err)
@@ -465,7 +462,7 @@ lp:
 	}
 
 	logger.Print("clearing channel")
-	for k := 0; k < concurrency; k++ {
+	for k := 0; k < cap(limit); k++ {
 		limit <- true
 	}
 
