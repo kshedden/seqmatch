@@ -72,7 +72,7 @@ func buildBloom() {
 
 	hashes := make([]rollinghash.Hash32, config.NumHash)
 	for j, _ := range hashes {
-		hashes[j] = buzhash.NewFromByteArray(tables[j])
+		hashes[j] = buzhash32.NewFromUint32Array(tables[j])
 	}
 
 	d, f := path.Split(config.ReadFileName)
@@ -174,7 +174,7 @@ func processseq(seq []byte, genenum int) {
 
 	hashes := make([]rollinghash.Hash32, config.NumHash)
 	for j, _ := range hashes {
-		hashes[j] = buzhash.NewFromByteArray(tables[j])
+		hashes[j] = buzhash32.NewFromUint32Array(tables[j])
 	}
 
 	hlen := config.WindowWidth
