@@ -473,6 +473,8 @@ func main() {
 		panic("Invalid read file")
 	}
 
+	setupLog()
+
 	// Create the directory for all temporary files, if needed
 	var d string
 	d, basename = path.Split(config.ReadFileName)
@@ -492,7 +494,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	setupLog()
 
 	if startpoint <= 0 {
 		compresssource()
