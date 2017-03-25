@@ -487,9 +487,9 @@ func main() {
 	}
 
 	// Create the directory for all temporary files, if needed
+	var d string
+	d, basename = path.Split(config.ReadFileName)
 	if config.TempDir == "" {
-		var d string
-		d, basename = path.Split(config.ReadFileName)
 		d = path.Join(d, "tmp")
 		err = os.MkdirAll(d, 0755)
 		if err != nil {
