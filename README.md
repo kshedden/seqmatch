@@ -1,8 +1,13 @@
 __Quick start__
 
 
-* Download the `install.sh`, `run.pbs`, `prep_target.pbs`, and
-`config.json` files from [here](https://github.com/kshedden/seqmatch).
+* Download the
+[install.sh](https://raw.githubusercontent.com/kshedden/seqmatch/master/install.sh),
+[run.pbs](https://raw.githubusercontent.com/kshedden/seqmatch/master/run.pbs),
+[prep_target.pbs](https://raw.githubusercontent.com/kshedden/seqmatch/master/prep_target.pbs),
+and
+[config.json](https://raw.githubusercontent.com/kshedden/seqmatch/master/config.json)
+files.
 
 * At the shell prompt in Flux, type `module load go`, then `/bin/sh
 install.sh`.
