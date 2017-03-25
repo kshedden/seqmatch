@@ -94,9 +94,10 @@ func main() {
 	}
 
 	config = utils.ReadConfig(os.Args[1])
-	tmpdir = os.Args[2]
 
 	if config.TempDir == "" {
+		tmpdir = os.Args[2]
+	} else {
 		tmpdir = config.TempDir
 	}
 
