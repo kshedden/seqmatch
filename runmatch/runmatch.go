@@ -251,6 +251,9 @@ func mergebloom() {
 		if nproc > len(config.Windows)-fp {
 			nproc = len(config.Windows) - fp
 		}
+		if nproc == 0 {
+			break
+		}
 
 		var cmds []*exec.Cmd
 		for k := fp; k < fp+nproc; k++ {
