@@ -64,9 +64,8 @@ func pipefromsz(fname string) string {
 				}
 			}()
 			return name
-		} else {
-			print(fmt.Sprintf("%v\n", err))
 		}
+		print(fmt.Sprintf("%v\n", err))
 	}
 
 	panic("unable to create pipe")
@@ -245,7 +244,7 @@ func sortbloom() {
 func mergebloom() {
 	logger.Printf("starting mergebloom")
 	var cmds []*exec.Cmd
-	for k, _ := range config.Windows {
+	for k := range config.Windows {
 		cmd := exec.Command("merge_bloom", jsonfile, fmt.Sprintf("%d", k), tmpdir)
 		cmd.Env = os.Environ()
 		cmd.Stderr = os.Stderr

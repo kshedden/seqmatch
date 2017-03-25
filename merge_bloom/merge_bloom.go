@@ -159,17 +159,16 @@ func (b *breader) Next() bool {
 		if (len(b.recs) > 0) && !bytes.Equal(b.recs[0].fields[0], rx.fields[0]) {
 			b.stash = rx
 			return true
-		} else {
-			// Check sorting (harder to check in other branch of the if).
-			if ii > 0 {
-				if bytes.Compare(b.last.fields[0], rx.fields[0]) > 0 {
-					logger.Print("file is not sorted")
-					panic("file is not sorted")
-				}
-			}
-			b.last = rx
-			b.recs = append(b.recs, rx)
 		}
+		// Check sorting (harder to check in other branch of the if).
+		if ii > 0 {
+			if bytes.Compare(b.last.fields[0], rx.fields[0]) > 0 {
+				logger.Print("file is not sorted")
+				panic("file is not sorted")
+			}
+		}
+		b.last = rx
+		b.recs = append(b.recs, rx)
 	}
 
 	if err := b.scanner.Err(); err != nil {
@@ -307,7 +306,7 @@ func setupLog(win int) {
 // rcpy deeply copies its argument.
 func rcpy(r []*rec) []*rec {
 	x := make([]*rec, len(r))
-	for j, _ := range x {
+	for j := range x {
 		x[j] = new(rec)
 		x[j].init()
 		x[j].buf = x[j].buf[0:len(r[j].buf)]

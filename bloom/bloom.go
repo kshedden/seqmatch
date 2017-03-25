@@ -73,7 +73,7 @@ func genTables() {
 func buildBloom() {
 
 	hashes := make([]rollinghash.Hash32, config.NumHash)
-	for j, _ := range hashes {
+	for j := range hashes {
 		hashes[j] = buzhash32.NewFromUint32Array(tables[j])
 	}
 
@@ -156,7 +156,7 @@ func checkwin(ix []int, iw []uint64, hashes []rollinghash.Hash32) []int {
 
 	for k, ba := range smp {
 		g := true
-		for j, _ := range hashes {
+		for j := range hashes {
 			f, err := ba.GetBit(iw[j])
 			if err != nil {
 				logger.Print(err)
@@ -178,12 +178,12 @@ func checkwin(ix []int, iw []uint64, hashes []rollinghash.Hash32) []int {
 func processseq(seq []byte, genenum int) {
 
 	hashes := make([]rollinghash.Hash32, config.NumHash)
-	for j, _ := range hashes {
+	for j := range hashes {
 		hashes[j] = buzhash32.NewFromUint32Array(tables[j])
 	}
 
 	hlen := config.WindowWidth
-	for j, _ := range hashes {
+	for j := range hashes {
 		_, err := hashes[j].Write(seq[0:hlen])
 		if err != nil {
 			panic(err)
@@ -354,7 +354,7 @@ func search() {
 		go processseq([]byte(seq), i)
 	}
 
-	for k := 0; k < concurrency; k += 1 {
+	for k := 0; k < concurrency; k++ {
 		limit <- true
 	}
 
@@ -412,7 +412,7 @@ func main() {
 	genTables()
 
 	smp = make([]bitarray.BitArray, len(config.Windows))
-	for k, _ := range smp {
+	for k := range smp {
 		smp[k] = bitarray.NewBitArray(config.BloomSize)
 	}
 
