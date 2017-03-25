@@ -442,7 +442,6 @@ func setupLog() {
 	logname := path.Join(d, "tmp", f)
 	fid, err := os.Create(logname)
 	if err != nil {
-		logger.Print(err)
 		panic(err)
 	}
 	logger = log.New(fid, "", log.Lshortfile)
