@@ -40,7 +40,8 @@ the results pooled.  Thus the overall query can be stated as:
 subsequence of a read exactly, and that match the overall read in at
 least `p` percent of the positions".  The values of `w` and `p` are
 configurable.  Smaller values of either of these parameters will yield
-more (approximate) matches, but will have longer running times.
+a greater number of more approximate matches, and the running time
+will generally be longer.
 
 The approach uses [Bloom
 filtering](https://en.wikipedia.org/wiki/Bloom_filter), [rolling
@@ -95,6 +96,9 @@ that need to match the read.
 
 * MaxMatches: The maximum number of mathches returned for each window
 in a gene.
+
+* MaxMergeProcs: The maximum number of merge operations that are
+  performed concurrently.
 
 A rule of thumb would be to set `BloomSize` equal to twice the number
 of reads times `NumHash`.
