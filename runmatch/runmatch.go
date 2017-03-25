@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -21,17 +22,18 @@ import (
 const ()
 
 var (
-	jsonfile string
-	config   *utils.Config
-	basename string
-	tmpdir   string
-	pipedir  string
-	logger   *log.Logger
+	jsonfile    string
+	tmpjsonfile string
+	config      *utils.Config
+	basename    string
+	tmpdir      string
+	pipedir     string
+	logger      *log.Logger
 )
 
 func compresssource() {
 	logger.Printf("starting compresssource")
-	cmd := exec.Command("prep_reads", jsonfile, tmpdir)
+	cmd := exec.Command("prep_reads", tmpjsonfile, tmpdir)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -123,7 +125,7 @@ func sortsource() {
 
 func windowreads() {
 	logger.Printf("starting windowreads")
-	cmd := exec.Command("window_reads", jsonfile, tmpdir)
+	cmd := exec.Command("window_reads", tmpjsonfile, tmpdir)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -182,7 +184,7 @@ func sortwindows() {
 
 func bloom() {
 	logger.Printf("starting bloom")
-	cmd := exec.Command("bloom", jsonfile, tmpdir)
+	cmd := exec.Command("bloom", tmpjsonfile, tmpdir)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -245,7 +247,7 @@ func mergebloom() {
 	logger.Printf("starting mergebloom")
 	var cmds []*exec.Cmd
 	for k := range config.Windows {
-		cmd := exec.Command("merge_bloom", jsonfile, fmt.Sprintf("%d", k), tmpdir)
+		cmd := exec.Command("merge_bloom", tmpjsonfile, fmt.Sprintf("%d", k), tmpdir)
 		cmd.Env = os.Environ()
 		cmd.Stderr = os.Stderr
 		err := cmd.Start()
@@ -446,6 +448,21 @@ func setupLog() {
 	logger = log.New(fid, "", log.Lshortfile)
 }
 
+func copyconfig(config *utils.Config, tmpdir string) {
+
+	fid, err := os.Create(path.Join(tmpdir, "config.json"))
+	if err != nil {
+		panic(err)
+	}
+	defer fid.Close()
+	enc := json.NewEncoder(fid)
+	err = enc.Encode(config)
+	if err != nil {
+		panic(err)
+	}
+	tmpjsonfile = path.Join(tmpdir, "config.json")
+}
+
 func main() {
 
 	if len(os.Args) != 3 {
@@ -493,6 +510,7 @@ func main() {
 			panic(err)
 		}
 	}
+	copyconfig(config, tmpdir)
 
 	logger.Printf("Storing temporary files in %s", tmpdir)
 	pipedir = path.Join(tmpdir, "pipes")
