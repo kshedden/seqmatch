@@ -486,8 +486,6 @@ func main() {
 		panic("Invalid read file")
 	}
 
-	setupLog()
-
 	// Create the directory for all temporary files, if needed
 	if config.TempDir == "" {
 		var d string
@@ -509,6 +507,8 @@ func main() {
 		}
 	}
 	copyconfig(config, tmpdir)
+
+	setupLog()
 
 	logger.Printf("Storing temporary files in %s", tmpdir)
 	pipedir = path.Join(tmpdir, "pipes")
