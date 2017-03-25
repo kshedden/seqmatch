@@ -78,9 +78,7 @@ func source() {
 }
 
 func setupLog() {
-	_, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", "_compress_source.log", 1)
-	logname := path.Join(tmpdir, f)
+	logname := path.Join(tmpdir, "compress_source.log")
 	fid, err := os.Create(logname)
 	if err != nil {
 		panic(err)

@@ -438,9 +438,7 @@ func joingenenames() {
 }
 
 func setupLog() {
-	_, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", "_run.log", 1)
-	logname := path.Join(tmpdir, f)
+	logname := path.Join(tmpdir, "run.log")
 	fid, err := os.Create(logname)
 	if err != nil {
 		panic(err)

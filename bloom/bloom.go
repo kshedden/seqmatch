@@ -363,9 +363,7 @@ func search() {
 }
 
 func setupLogger() {
-	_, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", "_bloom.log", 1)
-	logname := path.Join(tmpdir, f)
+	logname := path.Join(tmpdir, "bloom.log")
 	logfid, err := os.Create(logname)
 	if err != nil {
 		panic(err)

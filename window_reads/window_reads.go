@@ -32,9 +32,7 @@ var (
 )
 
 func setupLog() {
-	_, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", "_window_reads.log", 1)
-	logname := path.Join(tmpdir, f)
+	logname := path.Join(tmpdir, "window_reads.log")
 	fid, err := os.Create(logname)
 	if err != nil {
 		panic(err)

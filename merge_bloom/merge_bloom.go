@@ -289,13 +289,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 }
 
 func setupLog(win int) {
-	_, f := path.Split(config.ReadFileName)
-	q1 := config.Windows[win]
-	q2 := q1 + config.WindowWidth
-	s := fmt.Sprintf("_mergebloom_%d_%d_%.0f.log", q1, q2, 100*config.PMatch)
-	f = strings.Replace(f, ".fastq", s, 1)
-	logname := path.Join(tmpdir, f)
-
+	logname := path.Join(tmpdir, fmt.Sprintf("mergebloom_%d.log", win))
 	fid, err := os.Create(logname)
 	if err != nil {
 		panic(err)
