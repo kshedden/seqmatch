@@ -467,11 +467,20 @@ func main() {
 		panic("wrong number of arguments")
 	}
 
-	os.Setenv("LC_ALL", "C")
+	err := os.Setenv("LC_ALL", "C")
+	if err != nil {
+		panic(err)
+	}
 	home := os.Getenv("HOME")
 	gopath := path.Join(home, "go")
-	os.Setenv("GOPATH", gopath)
-	os.Setenv("PATH", os.Getenv("PATH")+":"+home+"/go/bin")
+	err = os.Setenv("GOPATH", gopath)
+	if err != nil {
+		panic(err)
+	}
+	err = os.Setenv("PATH", os.Getenv("PATH")+":"+home+"/go/bin")
+	if err != nil {
+		panic(err)
+	}
 
 	jsonfile = os.Args[1]
 	config = utils.ReadConfig(jsonfile)

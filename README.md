@@ -17,7 +17,8 @@ install.sh`.
   does not utilize the sequencing read files at all.
 
 * Edit the `config.json` file to contain the proper paths for the read
-  and gene files, and adjust the run parameters if desired.  Then run
+  and gene files (the gene file name should be the output file of the
+  previous step).  Then adjust the run parameters if desired, and run
   `qsub run.pbs` to fully process one read file.  This currently takes
   around five hours (for aound 90M distinct reads and 60M distinct
   genes, using 20 hashes, and PMatch around 0.9-1).
@@ -26,13 +27,15 @@ __Goal and approach__
 
 The goal is to find all approximate matches from a set of reads into a
 gene sequence database.  To make the matching tractable and scalable,
-we require a window within a read to match exactly for it to count as
-a match.  The remainder of the read can match to a given level of
-accuracy (e.g. 90%).  Results for multiple exact match windows can be
-calculated in parallel and pooled, so the overall query can be stated
-as: "approximately find all genes that match a length `w` subsequence
-of a read exactly, and that match the overall read in at least `p`
-percent of the positions".
+we require at least one window within a read to match exactly.  The
+remainder of the read can match to a given level of accuracy
+(e.g. 90%).  The location of the exact match window can be varied, and
+the results pooled.  Thus the overall query can be stated as:
+"approximately find all genes that match a length `w` contiguous
+subsequence of a read exactly, and that match the overall read in at
+least `p` percent of the positions".  The values of `w` and `p` are
+configurable.  Smaller values of either of these parameters will yield
+more (approximate) matches, but will have longer running times.
 
 The approach uses [Bloom
 filtering](https://en.wikipedia.org/wiki/Bloom_filter), [rolling
@@ -43,23 +46,15 @@ For example, around 6GB of RAM should be sufficient for 100 million
 reads and 60 million target gene sequences, and the results will be
 complete in around 5 hours when using 10 cores.
 
-The user provides a window width (for the exact matching window), and
-a list of left endpoints for these windows.  For example, if the
-window width is 30 and the left endpoints are 0, 15, 30, 45, and 60,
-then the windows are [0, 30), [15, 45), [30, 60), [45, 75), and [60,
-90).  For a read to match a target, the sequence must match exactly in
-at least one of these windows.  The remainder of the sequence needs to
-match such that the overall identity between the read and its matching
-genome sequence exceeds the value given by the parameter `PMatch`.
-
-Notes:
-
-* Only the first encountered matching gene sequence for each read is
-  returned.  We could return all of the matches, but this dramatically
-  blows up the run time/file size, since it is dominated by a small
-  number of low-information reads that match many targets.  We could
-  also attempt to return only the best match, or a bounded number of
-  matches, but these are not implemented yet.
+The user provides a parameter `WindowWidth` (for the width of the
+exact matching window), and a list of left endpoints for these
+windows.  For example, if the window width is 30 and the left
+endpoints are 0, 15, 30, 45, and 60, then the exact match windows are
+[0, 30), [15, 45), [30, 60), [45, 75), and [60, 90).  For a read to
+match a target, the sequence must match exactly in at least one of
+these windows.  The remainder of the sequence needs to match such that
+the overall identity between the read and its matching genome sequence
+exceeds the value given by the parameter `PMatch`.
 
 __Configurable parameters__
 
@@ -92,6 +87,12 @@ that need to match the read.
   two times greater than `NumHash` times the number of gene sequences.
 
 * NumHash: The number of hashes used in the Bloom filter.
+
+* MaxMatches: The maximum number of mathches returned for each window
+in a gene.
+
+A rule of thumb would be to set `BloomSize` equal to twice the number
+of reads times `NumHash`.
 
 __Next steps__
 
