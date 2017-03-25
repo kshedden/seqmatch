@@ -474,6 +474,7 @@ func main() {
 	}
 
 	// Create the directory for all temporary files, if needed
+	var d string
 	d, basename = path.Split(config.ReadFileName)
 	tmpdir, err = ioutil.TempDir(path.Join(d, "tmp"), "")
 	if err != nil {
