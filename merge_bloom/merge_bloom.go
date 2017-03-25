@@ -38,6 +38,8 @@ var (
 
 	config *utils.Config
 
+	tmpdir string
+
 	// Pool of reusable byte slices
 	pool chan []byte
 
@@ -288,12 +290,12 @@ func searchpairs(source, match []*rec, limit chan bool) {
 }
 
 func setupLog(win int) {
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	q1 := config.Windows[win]
 	q2 := q1 + config.WindowWidth
 	s := fmt.Sprintf("_mergebloom_%d_%d_%.0f.log", q1, q2, 100*config.PMatch)
 	f = strings.Replace(f, ".fastq", s, 1)
-	logname := path.Join(d, "tmp", f)
+	logname := path.Join(tmpdir, f)
 
 	fid, err := os.Create(logname)
 	if err != nil {
@@ -318,7 +320,7 @@ func rcpy(r []*rec) []*rec {
 
 func main() {
 
-	if len(os.Args) != 3 {
+	if len(os.Args) != 4 {
 		panic("wrong number of arguments")
 	}
 
@@ -333,6 +335,12 @@ func main() {
 
 	config = utils.ReadConfig(os.Args[1])
 
+	if config.TempDir == "" {
+		tmpdir = config.TempDir
+	} else {
+		tmpdir = os.Args[2]
+	}
+
 	var err error
 	win, err = strconv.Atoi(os.Args[2])
 	if err != nil {
@@ -343,21 +351,21 @@ func main() {
 	q1 = config.Windows[win]
 	q2 = q1 + config.WindowWidth
 	s := fmt.Sprintf("_win_%d_%d_sorted.txt.sz", q1, q2)
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	f = strings.Replace(f, ".fastq", s, 1)
-	sourcefile := path.Join(d, "tmp", f)
+	sourcefile := path.Join(tmpdir, f)
 	logger.Printf("sourcefile: %s", sourcefile)
 
 	s = fmt.Sprintf("_%d_%d_smatch.txt.sz", q1, q2)
-	d, f = path.Split(config.ReadFileName)
+	_, f = path.Split(config.ReadFileName)
 	f = strings.Replace(f, ".fastq", s, 1)
-	matchfile := path.Join(d, "tmp", f)
+	matchfile := path.Join(tmpdir, f)
 	logger.Printf("matchfile: %s", matchfile)
 
 	s = fmt.Sprintf("_%d_%d_%.0f_rmatch.txt.sz", q1, q2, 100*config.PMatch)
-	d, f = path.Split(config.ReadFileName)
+	_, f = path.Split(config.ReadFileName)
 	f = strings.Replace(f, ".fastq", s, 1)
-	outfile := path.Join(d, "tmp", f)
+	outfile := path.Join(tmpdir, f)
 	logger.Printf("outfile: %s", outfile)
 
 	pool = make(chan []byte, poolsize)

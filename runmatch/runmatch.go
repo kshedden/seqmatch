@@ -31,7 +31,7 @@ var (
 
 func compresssource() {
 	logger.Printf("starting compresssource")
-	cmd := exec.Command("prep_reads", jsonfile)
+	cmd := exec.Command("prep_reads", jsonfile, tmpdir)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -124,7 +124,7 @@ func sortsource() {
 
 func windowreads() {
 	logger.Printf("starting windowreads")
-	cmd := exec.Command("window_reads", jsonfile)
+	cmd := exec.Command("window_reads", jsonfile, tmpdir)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -142,10 +142,10 @@ func sortwindows() {
 	for k := 0; k < len(config.Windows); k++ {
 		q1 := config.Windows[k]
 		q2 := q1 + config.WindowWidth
-		d, f := path.Split(config.ReadFileName)
+		_, f := path.Split(config.ReadFileName)
 		s := fmt.Sprintf("_win_%d_%d.txt.sz", q1, q2)
 		f = strings.Replace(f, ".fastq", s, 1)
-		fname := path.Join(d, "tmp", f)
+		fname := path.Join(tmpdir, f)
 		pname1 := pipefromsz(fname)
 
 		cmd2 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k1", pname1)
@@ -183,7 +183,7 @@ func sortwindows() {
 
 func bloom() {
 	logger.Printf("starting bloom")
-	cmd := exec.Command("bloom", jsonfile)
+	cmd := exec.Command("bloom", jsonfile, tmpdir)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -200,20 +200,20 @@ func sortbloom() {
 
 	for _, q1 := range config.Windows {
 		q2 := q1 + config.WindowWidth
-		d, f := path.Split(config.ReadFileName)
+		_, f := path.Split(config.ReadFileName)
 		s := fmt.Sprintf("_%d_%d_bmatch.txt.sz", q1, q2)
 		f = strings.Replace(f, ".fastq", s, 1)
-		fname := path.Join(d, "tmp", f)
+		fname := path.Join(tmpdir, f)
 		pname1 := pipefromsz(fname)
 
 		cmd2 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k1", pname1)
 		cmd2.Env = os.Environ()
 		cmd2.Stderr = os.Stderr
 
-		d, f = path.Split(config.ReadFileName)
+		_, f = path.Split(config.ReadFileName)
 		s = fmt.Sprintf("_%d_%d_smatch.txt.sz", q1, q2)
 		f = strings.Replace(f, ".fastq", s, 1)
-		fname = path.Join(d, "tmp", f)
+		fname = path.Join(tmpdir, f)
 		cmd3 := exec.Command("sztool", "-c", "-", fname)
 		cmd3.Env = os.Environ()
 		cmd3.Stderr = os.Stderr
@@ -246,7 +246,7 @@ func mergebloom() {
 	logger.Printf("starting mergebloom")
 	var cmds []*exec.Cmd
 	for k, _ := range config.Windows {
-		cmd := exec.Command("merge_bloom", jsonfile, fmt.Sprintf("%d", k))
+		cmd := exec.Command("merge_bloom", jsonfile, fmt.Sprintf("%d", k), tmpdir)
 		cmd.Env = os.Environ()
 		cmd.Stderr = os.Stderr
 		err := cmd.Start()
@@ -277,10 +277,10 @@ func combinewindows() {
 	c0.Stderr = os.Stderr
 
 	// The sorted results go to disk
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	s := fmt.Sprintf("_%.0f_matches.txt.sz", 100*config.PMatch)
 	f = strings.Replace(f, ".fastq", s, 1)
-	outname := path.Join(d, "tmp", f)
+	outname := path.Join(tmpdir, f)
 	c1 := exec.Command("sztool", "-c", "-", outname)
 	c1.Env = os.Environ()
 	c1.Stderr = os.Stderr
@@ -297,10 +297,10 @@ func combinewindows() {
 		q1 := config.Windows[j]
 		q2 := q1 + config.WindowWidth
 
-		d, f := path.Split(config.ReadFileName)
+		_, f := path.Split(config.ReadFileName)
 		s := fmt.Sprintf("_%d_%d_%.0f_rmatch.txt.sz", q1, q2, 100*config.PMatch)
 		f = strings.Replace(f, ".fastq", s, 1)
-		fname := path.Join(d, "tmp", f)
+		fname := path.Join(tmpdir, f)
 		c := exec.Command("sztool", "-d", fname)
 		c.Env = os.Environ()
 		c.Stderr = os.Stderr
@@ -333,15 +333,15 @@ func combinewindows() {
 func sortbygeneid() {
 
 	logger.Printf("starting sortbygeneid")
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	s := fmt.Sprintf("_%.0f_matches.txt.sz", 100*config.PMatch)
 	f = strings.Replace(f, ".fastq", s, 1)
-	inname := path.Join(d, "tmp", f)
+	inname := path.Join(tmpdir, f)
 
-	d, f = path.Split(config.ReadFileName)
+	_, f = path.Split(config.ReadFileName)
 	s = fmt.Sprintf("_%.0f_matches_sg.txt.sz", 100*config.PMatch)
 	f = strings.Replace(f, ".fastq", s, 1)
-	outname := path.Join(d, "tmp", f)
+	outname := path.Join(tmpdir, f)
 
 	// Sort by gene number
 	cmd1 := exec.Command("sztool", "-d", inname)
@@ -384,10 +384,10 @@ func joingenenames() {
 
 	logger.Printf("starting joingenenames")
 
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	s := fmt.Sprintf("_%.0f_matches_sg.txt.sz", 100*config.PMatch)
 	f = strings.Replace(f, ".fastq", s, 1)
-	inname := path.Join(d, "tmp", f)
+	inname := path.Join(tmpdir, f)
 	pname1 := pipefromsz(inname)
 	pname2 := pipefromsz(config.GeneIdFileName)
 
@@ -475,17 +475,22 @@ func main() {
 	setupLog()
 
 	// Create the directory for all temporary files, if needed
-	var d string
-	d, basename = path.Split(config.ReadFileName)
-	d = path.Join(d, "tmp")
-	err = os.MkdirAll(d, 0755)
-	if err != nil {
-		panic(err)
+	if config.TempDir == "" {
+		var d string
+		d, basename = path.Split(config.ReadFileName)
+		d = path.Join(d, "tmp")
+		err = os.MkdirAll(d, 0755)
+		if err != nil {
+			panic(err)
+		}
+		tmpdir, err = ioutil.TempDir(d, "")
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		tmpdir = config.TempDir
 	}
-	tmpdir, err = ioutil.TempDir(d, "")
-	if err != nil {
-		panic(err)
-	}
+
 	logger.Printf("Storing temporary files in %s", tmpdir)
 	pipedir = path.Join(tmpdir, "pipes")
 	logger.Printf("Storing pipes in %s", pipedir)

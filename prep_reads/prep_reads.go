@@ -16,14 +16,16 @@ import (
 var (
 	config *utils.Config
 
+	tmpdir string
+
 	logger *log.Logger
 )
 
 func source() {
 
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	f = strings.Replace(f, ".fastq", ".txt.sz", 1)
-	outfile := path.Join(d, "tmp", f)
+	outfile := path.Join(tmpdir, f)
 
 	out, err := os.Create(outfile)
 	if err != nil {
@@ -76,9 +78,9 @@ func source() {
 }
 
 func setupLog() {
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	f = strings.Replace(f, ".fastq", "_compress_source.log", 1)
-	logname := path.Join(d, "tmp", f)
+	logname := path.Join(tmpdir, f)
 	fid, err := os.Create(logname)
 	if err != nil {
 		panic(err)
@@ -87,11 +89,16 @@ func setupLog() {
 }
 
 func main() {
-	if len(os.Args) != 2 {
+	if len(os.Args) != 3 {
 		panic("wrong number of arguments\n")
 	}
 
 	config = utils.ReadConfig(os.Args[1])
+	tmpdir = os.Args[2]
+
+	if config.TempDir == "" {
+		tmpdir = config.TempDir
+	}
 
 	setupLog()
 	source()

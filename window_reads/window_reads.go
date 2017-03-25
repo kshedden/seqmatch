@@ -26,13 +26,15 @@ import (
 var (
 	logger *log.Logger
 
+	tmpdir string
+
 	config *utils.Config
 )
 
 func setupLog() {
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	f = strings.Replace(f, ".fastq", "_window_reads.log", 1)
-	logname := path.Join(d, "tmp", f)
+	logname := path.Join(tmpdir, f)
 	fid, err := os.Create(logname)
 	if err != nil {
 		panic(err)
@@ -42,19 +44,25 @@ func setupLog() {
 
 func main() {
 
-	if len(os.Args) != 2 {
+	if len(os.Args) != 3 {
 		panic("wrong number of arguments")
 	}
 
 	config = utils.ReadConfig(os.Args[1])
 
+	if config.TempDir == "" {
+		tmpdir = os.Args[2]
+	} else {
+		tmpdir = config.TempDir
+	}
+
 	setupLog()
 
 	// Setup input reader
 	fname := config.ReadFileName
-	d, f := path.Split(fname)
+	_, f := path.Split(fname)
 	f = strings.Replace(f, ".fastq", "_sorted.txt.sz", 1)
-	fname = path.Join(d, "tmp", f)
+	fname = path.Join(tmpdir, f)
 	fid, err := os.Open(fname)
 	if err != nil {
 		panic(err)
@@ -73,9 +81,9 @@ func main() {
 		q1 := config.Windows[k]
 		q2 := q1 + config.WindowWidth
 		s := fmt.Sprintf("_win_%d_%d.txt.sz", q1, q2)
-		d, f := path.Split(config.ReadFileName)
+		_, f := path.Split(config.ReadFileName)
 		f = strings.Replace(f, ".fastq", s, 1)
-		outfile := path.Join(d, "tmp", f)
+		outfile := path.Join(tmpdir, f)
 		gid, err := os.Create(outfile)
 		if err != nil {
 			panic(err)

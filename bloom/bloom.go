@@ -38,6 +38,8 @@ var (
 
 	config *utils.Config
 
+	tmpdir string
+
 	// Bitarrays that back the Bloom filter
 	smp []bitarray.BitArray
 
@@ -75,9 +77,9 @@ func buildBloom() {
 		hashes[j] = buzhash32.NewFromUint32Array(tables[j])
 	}
 
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	f = strings.Replace(f, ".fastq", "_sorted.txt.sz", 1)
-	fname := path.Join(d, "tmp", f)
+	fname := path.Join(tmpdir, f)
 	fid, err := os.Open(fname)
 	if err != nil {
 		logger.Print(err)
@@ -311,10 +313,10 @@ func search() {
 	var wtrs []io.Writer
 	for k := 0; k < len(config.Windows); k++ {
 		q1 := config.Windows[k]
-		d, f := path.Split(config.ReadFileName)
+		_, f := path.Split(config.ReadFileName)
 		s := fmt.Sprintf("_%d_%d_bmatch.txt.sz", q1, q1+config.WindowWidth)
 		f = strings.Replace(f, ".fastq", s, 1)
-		outname := path.Join(d, "tmp", f)
+		outname := path.Join(tmpdir, f)
 		out, err := os.Create(outname)
 		if err != nil {
 			logger.Print(err)
@@ -355,9 +357,9 @@ func search() {
 }
 
 func setupLogger() {
-	d, f := path.Split(config.ReadFileName)
+	_, f := path.Split(config.ReadFileName)
 	f = strings.Replace(f, ".fastq", "_bloom.log", 1)
-	logname := path.Join(d, "tmp", f)
+	logname := path.Join(tmpdir, f)
 	logfid, err := os.Create(logname)
 	if err != nil {
 		logger.Print(err)
@@ -389,11 +391,17 @@ func estimateFullness() {
 
 func main() {
 
-	if len(os.Args) != 2 {
+	if len(os.Args) != 3 {
 		panic("wrong number of arguments")
 	}
 
 	config = utils.ReadConfig(os.Args[1])
+
+	if config.TempDir == "" {
+		tmpdir = os.Args[2]
+	} else {
+		tmpdir = config.TempDir
+	}
 
 	setupLogger()
 	genTables()

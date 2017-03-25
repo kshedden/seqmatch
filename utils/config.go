@@ -35,6 +35,10 @@ type Config struct {
 	// dinucleotides.
 	MinDinuc int
 
+	// Use this location to place temporary files.  If blank or
+	// missing, a temporary file name is generated.
+	TempDir string
+
 	// Skip all reads shorter than this length.
 	MinReadLength int
 }
