@@ -114,7 +114,10 @@ func buildBloom() {
 
 			for _, ha := range hashes {
 				ha.Reset()
-				ha.Write(seqw)
+				_, err = ha.Write(seqw)
+				if err != nil {
+					panic(err)
+				}
 				x := uint64(ha.Sum32()) % config.BloomSize
 				err := smp[k].SetBit(x)
 				if err != nil {
@@ -181,7 +184,10 @@ func processseq(seq []byte, genenum int) {
 
 	hlen := config.WindowWidth
 	for j, _ := range hashes {
-		hashes[j].Write(seq[0:hlen])
+		_, err := hashes[j].Write(seq[0:hlen])
+		if err != nil {
+			panic(err)
+		}
 	}
 	ix := make([]int, len(smp))
 	iw := make([]uint64, config.NumHash)

@@ -335,7 +335,7 @@ func main() {
 	config = utils.ReadConfig(os.Args[1])
 
 	if config.TempDir == "" {
-		tmpdir = os.Args[2]
+		tmpdir = os.Args[3]
 	} else {
 		tmpdir = config.TempDir
 	}
