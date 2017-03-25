@@ -227,6 +227,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 		mgene := mrec.fields[3]
 		mpos := mrec.fields[4]
 
+		nhit := 0
 		for _, srec := range source {
 
 			stag = srec.fields[0] // must equal mtag
@@ -270,9 +271,10 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			bbuf.Write([]byte(x))
 			rsltChan <- bbuf.Bytes()
 
-			// one match is enough for now (may need to
-			// make this configurable)
-			break
+			nhit++
+			if nhit >= config.MaxMatches {
+				break
+			}
 		}
 	}
 

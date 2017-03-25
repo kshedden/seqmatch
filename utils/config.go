@@ -41,6 +41,9 @@ type Config struct {
 
 	// Skip all reads shorter than this length.
 	MinReadLength int
+
+	// Return at most this many matches for each read (defaults to 1).
+	MaxMatches int
 }
 
 func ReadConfig(filename string) *Config {
@@ -55,5 +58,10 @@ func ReadConfig(filename string) *Config {
 	if err != nil {
 		panic(err)
 	}
+
+	if config.MaxMatches == 0 {
+		config.MaxMatches = 1
+	}
+
 	return config
 }
