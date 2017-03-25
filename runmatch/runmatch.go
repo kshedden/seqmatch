@@ -245,23 +245,32 @@ func sortbloom() {
 
 func mergebloom() {
 	logger.Printf("starting mergebloom")
-	var cmds []*exec.Cmd
-	for k := range config.Windows {
-		cmd := exec.Command("merge_bloom", tmpjsonfile, fmt.Sprintf("%d", k), tmpdir)
-		cmd.Env = os.Environ()
-		cmd.Stderr = os.Stderr
-		err := cmd.Start()
-		if err != nil {
-			panic(err)
+	fp := 0
+	for {
+		nproc := config.MaxMergeProcs
+		if nproc > len(config.Windows)-fp {
+			nproc = len(config.Windows) - fp
 		}
-		cmds = append(cmds, cmd)
-	}
 
-	for _, cmd := range cmds {
-		err := cmd.Wait()
-		if err != nil {
-			panic(err)
+		var cmds []*exec.Cmd
+		for k := fp; k < fp+nproc; k++ {
+			cmd := exec.Command("merge_bloom", tmpjsonfile, fmt.Sprintf("%d", k), tmpdir)
+			cmd.Env = os.Environ()
+			cmd.Stderr = os.Stderr
+			err := cmd.Start()
+			if err != nil {
+				panic(err)
+			}
+			cmds = append(cmds, cmd)
 		}
+
+		for _, cmd := range cmds {
+			err := cmd.Wait()
+			if err != nil {
+				panic(err)
+			}
+		}
+		fp += nproc
 	}
 	logger.Printf("mergebloom done")
 }

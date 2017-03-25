@@ -42,8 +42,13 @@ type Config struct {
 	// Skip all reads shorter than this length.
 	MinReadLength int
 
-	// Return at most this many matches for each read (defaults to 1).
+	// Return at most this many matches for each read, defaults to
+	// 1.
 	MaxMatches int
+
+	// The maximum number of merge processes that are run
+	// simultaneously, defaults to 3.
+	MaxMergeProcs int
 }
 
 func ReadConfig(filename string) *Config {
@@ -61,6 +66,10 @@ func ReadConfig(filename string) *Config {
 
 	if config.MaxMatches == 0 {
 		config.MaxMatches = 1
+	}
+
+	if config.MaxMergeProcs == 0 {
+		config.MaxMergeProcs = 3
 	}
 
 	return config
