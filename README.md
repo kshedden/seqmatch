@@ -20,7 +20,7 @@ install.sh`.
   and gene files (the gene file name should be the output file of the
   previous step).  Then adjust the run parameters if desired, and run
   `qsub run.pbs` to fully process one read file.  This currently takes
-  around five hours (for aound 90M distinct reads and 60M distinct
+  around five hours (for around 90M distinct reads and 60M distinct
   genes, using 20 hashes, and PMatch around 0.9-1).
 
 __Goal and approach__
@@ -76,7 +76,7 @@ Some parameters can be configured in the `config.json` file:
 
 * Windows: The left edges of windows, one of which must match exactly.
 
-* MinDinuc: The minum number of distinct dinucleotides that must be
+* MinDinuc: The minimum number of distinct dinucleotides that must be
 present in a read (or it is dropped).  This eliminates uninformative
 matches that take a lot of space and time to enumerate.
 
