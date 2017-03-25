@@ -488,6 +488,10 @@ func main() {
 		}
 	} else {
 		tmpdir = config.TempDir
+		err = os.MkdirAll(tmpdir, 0755)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	logger.Printf("Storing temporary files in %s", tmpdir)
