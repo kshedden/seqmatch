@@ -476,7 +476,10 @@ func main() {
 	// Create the directory for all temporary files, if needed
 	var d string
 	d, basename = path.Split(config.ReadFileName)
-	tmpdir = ioutil.TempDir("tmp", "")
+	tmpdir, err = ioutil.TempDir("tmp", "")
+	if err != nil {
+		panic(err)
+	}
 	pipedir = path.Join(tmpdir, "pipes")
 	err = os.MkdirAll(pipedir, 0755) // ignore the error if the directory exists
 	if err != nil {
