@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -475,7 +476,7 @@ func main() {
 	// Create the directory for all temporary files, if needed
 	var d string
 	d, basename = path.Split(config.ReadFileName)
-	tmpdir = path.Join(d, "tmp")
+	tmpdir = ioutil.TempDir("tmp", "")
 	pipedir = path.Join(tmpdir, "pipes")
 	err = os.MkdirAll(pipedir, 0755) // ignore the error if the directory exists
 	if err != nil {
