@@ -299,7 +299,6 @@ func setupLog(win int) {
 
 	fid, err := os.Create(logname)
 	if err != nil {
-		logger.Print(err)
 		panic(err)
 	}
 	logger = log.New(fid, "", log.Lshortfile)
@@ -400,7 +399,7 @@ func main() {
 	}
 	defer fi.Close()
 	out := snappy.NewBufferedWriter(fi)
-	defer out.Flush()
+	defer out.Close()
 
 	source.Next()
 	match.Next()

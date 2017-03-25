@@ -362,7 +362,6 @@ func setupLogger() {
 	logname := path.Join(tmpdir, f)
 	logfid, err := os.Create(logname)
 	if err != nil {
-		logger.Print(err)
 		panic(err)
 	}
 	logger = log.New(logfid, "", log.Lshortfile)
