@@ -8,5 +8,8 @@
     "BloomSize": 4000000000,
     "NumHash": 20,
     "MinDinuc": 5,
-    "PMatch": 0.8
+    "PMatch": 0.8,
+    "MaxMatches": 10,
+    "MaxMergeProcs": 3,
+    "TempDir": ""
 }
