@@ -103,6 +103,14 @@ in a gene.
 A rule of thumb would be to set `BloomSize` equal to twice the number
 of reads times `NumHash`.
 
+__Logging__
+
+Several log files are written to the workspace directory.  If the
+program completes successfully, the file `run.log` will end with a
+line that reads "All done, exiting".  If this is not the case, the
+program has ended early for some reason.  You can look in some of the
+other log files to see if any useful error information is present.
+
 __Next steps__
 
 Count the distinct reads that successfully match into the genes:

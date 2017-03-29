@@ -290,10 +290,7 @@ func combinewindows() {
 	c0.Stderr = os.Stderr
 
 	// The sorted results go to disk
-	_, f := path.Split(config.ReadFileName)
-	s := fmt.Sprintf("_%.0f_matches.txt.sz", 100*config.PMatch)
-	f = strings.Replace(f, ".fastq", s, 1)
-	outname := path.Join(tmpdir, f)
+	outname := path.Join(tmpdir, "matches.txt.sz")
 	c1 := exec.Command("sztool", "-c", "-", outname)
 	c1.Env = os.Environ()
 	c1.Stderr = os.Stderr
@@ -346,15 +343,8 @@ func combinewindows() {
 func sortbygeneid() {
 
 	logger.Printf("starting sortbygeneid")
-	_, f := path.Split(config.ReadFileName)
-	s := fmt.Sprintf("_%.0f_matches.txt.sz", 100*config.PMatch)
-	f = strings.Replace(f, ".fastq", s, 1)
-	inname := path.Join(tmpdir, f)
-
-	_, f = path.Split(config.ReadFileName)
-	s = fmt.Sprintf("_%.0f_matches_sg.txt.sz", 100*config.PMatch)
-	f = strings.Replace(f, ".fastq", s, 1)
-	outname := path.Join(tmpdir, f)
+	inname := path.Join(tmpdir, "matches.txt.sz")
+	outname := path.Join(tmpdir, "matches_sg.txt.sz")
 
 	// Sort by gene number
 	cmd1 := exec.Command("sztool", "-d", inname)
@@ -397,10 +387,7 @@ func joingenenames() {
 
 	logger.Printf("starting joingenenames")
 
-	_, f := path.Split(config.ReadFileName)
-	s := fmt.Sprintf("_%.0f_matches_sg.txt.sz", 100*config.PMatch)
-	f = strings.Replace(f, ".fastq", s, 1)
-	inname := path.Join(tmpdir, f)
+	inname := path.Join(tmpdir, "matches_sg.txt.sz")
 	pname1 := pipefromsz(inname)
 	pname2 := pipefromsz(config.GeneIdFileName)
 
@@ -415,8 +402,8 @@ func joingenenames() {
 	pi, err := cmd1.StdoutPipe()
 	cmd2.Stdin = pi
 
-	s = fmt.Sprintf("_%.0f_matches.txt", 100*config.PMatch)
-	outname := strings.Replace(config.ReadFileName, ".fastq", s, 1)
+	outname := fmt.Sprintf("_%.0f_matches.txt", 100*config.PMatch)
+	outname = strings.Replace(config.ReadFileName, ".fastq", outname, 1)
 	fid, err := os.Create(outname)
 	if err != nil {
 		panic(err)
@@ -578,4 +565,6 @@ func main() {
 	if startpoint <= 9 {
 		joingenenames()
 	}
+
+	logger.Printf("All done, exiting")
 }
