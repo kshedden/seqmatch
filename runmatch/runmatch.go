@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +12,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kshedden/seqmatch/utils"
@@ -397,22 +395,27 @@ func joingenenames() {
 	if err != nil {
 		panic(err)
 	}
-	w := bufio.NewWriter(fid)
-	pi2, err := cmd2.StdoutPipe()
-	if err != nil {
-		panic(err)
-	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		_, err := io.Copy(w, pi2)
+	defer fid.Close()
+	cmd2.Stdout = fid
+
+	/*
+		w := bufio.NewWriter(fid)
+		pi2, err := cmd2.StdoutPipe()
 		if err != nil {
 			panic(err)
 		}
-		w.Flush()
-		fid.Close()
-		wg.Done()
-	}()
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			_, err := io.Copy(w, pi2)
+			if err != nil {
+				panic(err)
+			}
+			w.Flush()
+			fid.Close()
+			wg.Done()
+		}()
+	*/
 
 	cmds := []*exec.Cmd{cmd1, cmd2}
 
@@ -430,7 +433,7 @@ func joingenenames() {
 		}
 	}
 
-	wg.Wait()
+	//wg.Wait()
 
 	logger.Printf("joingenenames done")
 }
