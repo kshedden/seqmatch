@@ -13,6 +13,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kshedden/seqmatch/utils"
@@ -396,14 +397,22 @@ func joingenenames() {
 	if err != nil {
 		panic(err)
 	}
-	defer fid.Close()
 	w := bufio.NewWriter(fid)
 	pi2, err := cmd2.StdoutPipe()
 	if err != nil {
 		panic(err)
 	}
-	go io.Copy(w, pi2)
-	defer w.Flush()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		_, err := io.Copy(w, pi2)
+		if err != nil {
+			panic(err)
+		}
+		w.Flush()
+		fid.Close()
+		wg.Done()
+	}()
 
 	cmds := []*exec.Cmd{cmd1, cmd2}
 
@@ -420,6 +429,8 @@ func joingenenames() {
 			panic(err)
 		}
 	}
+
+	wg.Wait()
 
 	logger.Printf("joingenenames done")
 }
