@@ -297,12 +297,7 @@ func combinewindows() {
 
 	var fd []io.Reader
 	for j := 0; j < len(config.Windows); j++ {
-		q1 := config.Windows[j]
-		q2 := q1 + config.WindowWidth
-
-		_, f := path.Split(config.ReadFileName)
-		s := fmt.Sprintf("_%d_%d_%.0f_rmatch.txt.sz", q1, q2, 100*config.PMatch)
-		f = strings.Replace(f, ".fastq", s, 1)
+		f := fmt.Sprintf("rmatch_%d.txt.sz", j)
 		fname := path.Join(tmpdir, f)
 		c := exec.Command("sztool", "-d", fname)
 		c.Env = os.Environ()
