@@ -17,7 +17,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
@@ -57,10 +56,7 @@ func main() {
 	setupLog()
 
 	// Setup input reader
-	fname := config.ReadFileName
-	_, f := path.Split(fname)
-	f = strings.Replace(f, ".fastq", "_sorted.txt.sz", 1)
-	fname = path.Join(tmpdir, f)
+	fname := path.Join(tmpdir, "reads_sorted.txt.sz")
 	fid, err := os.Open(fname)
 	if err != nil {
 		panic(err)
@@ -76,11 +72,7 @@ func main() {
 	// Setup output writers
 	var wtrs []io.Writer
 	for k := 0; k < len(config.Windows); k++ {
-		q1 := config.Windows[k]
-		q2 := q1 + config.WindowWidth
-		s := fmt.Sprintf("_win_%d_%d.txt.sz", q1, q2)
-		_, f := path.Split(config.ReadFileName)
-		f = strings.Replace(f, ".fastq", s, 1)
+		f := fmt.Sprintf("win_%d.txt.sz", k)
 		outfile := path.Join(tmpdir, f)
 		gid, err := os.Create(outfile)
 		if err != nil {

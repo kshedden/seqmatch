@@ -44,8 +44,6 @@ var (
 	pool chan []byte
 
 	win int // The window to process, win=0,1,...
-	q1  int // The start position of the window
-	q2  int // The end position of the window
 
 	// Pass results to driver then write to disk
 	rsltChan chan []byte
@@ -342,23 +340,15 @@ func main() {
 	}
 	setupLog(win)
 
-	q1 = config.Windows[win]
-	q2 = q1 + config.WindowWidth
-	s := fmt.Sprintf("_win_%d_%d_sorted.txt.sz", q1, q2)
-	_, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", s, 1)
+	f := fmt.Sprintf("win_%d_sorted.txt.sz", win)
 	sourcefile := path.Join(tmpdir, f)
 	logger.Printf("sourcefile: %s", sourcefile)
 
-	s = fmt.Sprintf("_%d_%d_smatch.txt.sz", q1, q2)
-	_, f = path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", s, 1)
+	f = fmt.Sprintf("smatch_%d.txt.sz", win)
 	matchfile := path.Join(tmpdir, f)
 	logger.Printf("matchfile: %s", matchfile)
 
-	s = fmt.Sprintf("_%d_%d_%.0f_rmatch.txt.sz", q1, q2, 100*config.PMatch)
-	_, f = path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", s, 1)
+	f = fmt.Sprintf("rmatch_%d.txt.sz", win)
 	outfile := path.Join(tmpdir, f)
 	logger.Printf("outfile: %s", outfile)
 

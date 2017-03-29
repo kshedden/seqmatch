@@ -76,8 +76,8 @@ func pipefromsz(fname string) string {
 func sortsource() {
 
 	logger.Printf("starting sortsource")
-	fname := strings.Replace(basename, ".fastq", ".txt.sz", 1)
-	fname = path.Join(tmpdir, fname)
+
+	fname := path.Join(tmpdir, "reads.txt.sz")
 	pname1 := pipefromsz(fname)
 	logger.Printf("Reading from %s", fname)
 
@@ -94,8 +94,7 @@ func sortsource() {
 		panic(err)
 	}
 
-	outname := strings.Replace(basename, ".fastq", "_sorted.txt.sz", 1)
-	outname = path.Join(tmpdir, outname)
+	outname := path.Join(tmpdir, "reads_sorted.txt.sz")
 	logger.Printf("Writing to %s", outname)
 	cmd4 := exec.Command("sztool", "-c", "-", outname)
 	cmd4.Env = os.Environ()
@@ -120,11 +119,13 @@ func sortsource() {
 			panic(err)
 		}
 	}
+
 	logger.Printf("sortsource done")
 }
 
 func windowreads() {
 	logger.Printf("starting windowreads")
+
 	cmd := exec.Command("window_reads", tmpjsonfile, tmpdir)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
@@ -132,6 +133,7 @@ func windowreads() {
 	if err != nil {
 		panic(err)
 	}
+
 	logger.Printf("windowreads done")
 }
 
@@ -141,11 +143,7 @@ func sortwindows() {
 	var cmds []*exec.Cmd
 
 	for k := 0; k < len(config.Windows); k++ {
-		q1 := config.Windows[k]
-		q2 := q1 + config.WindowWidth
-		_, f := path.Split(config.ReadFileName)
-		s := fmt.Sprintf("_win_%d_%d.txt.sz", q1, q2)
-		f = strings.Replace(f, ".fastq", s, 1)
+		f := fmt.Sprintf("win_%d.txt.sz", k)
 		fname := path.Join(tmpdir, f)
 		pname1 := pipefromsz(fname)
 
@@ -199,11 +197,8 @@ func sortbloom() {
 	logger.Printf("starting sortbloom")
 	var cmds []*exec.Cmd
 
-	for _, q1 := range config.Windows {
-		q2 := q1 + config.WindowWidth
-		_, f := path.Split(config.ReadFileName)
-		s := fmt.Sprintf("_%d_%d_bmatch.txt.sz", q1, q2)
-		f = strings.Replace(f, ".fastq", s, 1)
+	for k := range config.Windows {
+		f := fmt.Sprintf("bmatch_%d.txt.sz", k)
 		fname := path.Join(tmpdir, f)
 		pname1 := pipefromsz(fname)
 
@@ -211,9 +206,7 @@ func sortbloom() {
 		cmd2.Env = os.Environ()
 		cmd2.Stderr = os.Stderr
 
-		_, f = path.Split(config.ReadFileName)
-		s = fmt.Sprintf("_%d_%d_smatch.txt.sz", q1, q2)
-		f = strings.Replace(f, ".fastq", s, 1)
+		f = fmt.Sprintf("smatch_%d.txt.sz", k)
 		fname = path.Join(tmpdir, f)
 		cmd3 := exec.Command("sztool", "-c", "-", fname)
 		cmd3.Env = os.Environ()

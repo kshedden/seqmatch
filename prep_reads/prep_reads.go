@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
@@ -23,9 +22,7 @@ var (
 
 func source() {
 
-	_, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", ".txt.sz", 1)
-	outfile := path.Join(tmpdir, f)
+	outfile := path.Join(tmpdir, "reads.txt.sz")
 
 	out, err := os.Create(outfile)
 	if err != nil {

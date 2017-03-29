@@ -77,9 +77,7 @@ func buildBloom() {
 		hashes[j] = buzhash32.NewFromUint32Array(tables[j])
 	}
 
-	_, f := path.Split(config.ReadFileName)
-	f = strings.Replace(f, ".fastq", "_sorted.txt.sz", 1)
-	fname := path.Join(tmpdir, f)
+	fname := path.Join(tmpdir, "reads_sorted.txt.sz")
 	fid, err := os.Open(fname)
 	if err != nil {
 		logger.Print(err)
@@ -318,10 +316,7 @@ func search() {
 
 	var wtrs []io.Writer
 	for k := 0; k < len(config.Windows); k++ {
-		q1 := config.Windows[k]
-		_, f := path.Split(config.ReadFileName)
-		s := fmt.Sprintf("_%d_%d_bmatch.txt.sz", q1, q1+config.WindowWidth)
-		f = strings.Replace(f, ".fastq", s, 1)
+		f := fmt.Sprintf("bmatch_%d.txt.sz", k)
 		outname := path.Join(tmpdir, f)
 		out, err := os.Create(outname)
 		if err != nil {
