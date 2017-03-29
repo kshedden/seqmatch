@@ -261,7 +261,22 @@ func processseq(seq []byte, genenum int) {
 }
 
 // Retrieve the results and write to disk
-func harvest(wtrs []io.Writer) {
+func harvest() {
+
+	var wtrs []io.Writer
+	for k := 0; k < len(config.Windows); k++ {
+		f := fmt.Sprintf("bmatch_%d.txt.sz", k)
+		outname := path.Join(tmpdir, f)
+		out, err := os.Create(outname)
+		if err != nil {
+			logger.Print(err)
+			panic(err)
+		}
+		defer out.Close()
+		wtr := snappy.NewBufferedWriter(out)
+		defer wtr.Close()
+		wtrs = append(wtrs, wtr)
+	}
 
 	bb := bytes.Repeat([]byte(" "), lw)
 	bb[lw-1] = byte('\n')
@@ -314,21 +329,7 @@ func search() {
 	hitchan = make(chan rec)
 	limit = make(chan bool, concurrency)
 
-	var wtrs []io.Writer
-	for k := 0; k < len(config.Windows); k++ {
-		f := fmt.Sprintf("bmatch_%d.txt.sz", k)
-		outname := path.Join(tmpdir, f)
-		out, err := os.Create(outname)
-		if err != nil {
-			logger.Print(err)
-			panic(err)
-		}
-		defer out.Close()
-		wtr := snappy.NewBufferedWriter(out)
-		defer wtr.Close()
-		wtrs = append(wtrs, wtr)
-	}
-	go harvest(wtrs)
+	go harvest()
 
 	for i := 0; scanner.Scan(); i++ {
 

@@ -398,25 +398,6 @@ func joingenenames() {
 	defer fid.Close()
 	cmd2.Stdout = fid
 
-	/*
-		w := bufio.NewWriter(fid)
-		pi2, err := cmd2.StdoutPipe()
-		if err != nil {
-			panic(err)
-		}
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			_, err := io.Copy(w, pi2)
-			if err != nil {
-				panic(err)
-			}
-			w.Flush()
-			fid.Close()
-			wg.Done()
-		}()
-	*/
-
 	cmds := []*exec.Cmd{cmd1, cmd2}
 
 	for _, c := range cmds {
@@ -432,8 +413,6 @@ func joingenenames() {
 			panic(err)
 		}
 	}
-
-	//wg.Wait()
 
 	logger.Printf("joingenenames done")
 }
