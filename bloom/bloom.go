@@ -1,8 +1,8 @@
 // Identify possible matches of a set of source sequences into a set
 // of target sequences.
 //
-// The result may contain false positives, but will not have any false
-// negatives.
+// The results may contain false positives, but will not have any
+// false negatives.
 
 package main
 
@@ -29,15 +29,17 @@ const (
 	concurrency int = 100
 
 	// Line length for output
-	lw int = 150
+	bufsize int = 150
 )
 
 var (
 	// A log
 	logger *log.Logger
 
+	// Configuration information
 	config *utils.Config
 
+	// All working files are stored here
 	tmpdir string
 
 	// Bitarrays that back the Bloom filter
@@ -70,6 +72,7 @@ func genTables() {
 	}
 }
 
+// buildBloom constructs bloom filters for each window, and
 func buildBloom() {
 
 	hashes := make([]rollinghash.Hash32, config.NumHash)
@@ -173,6 +176,7 @@ func checkwin(ix []int, iw []uint64, hashes []rollinghash.Hash32) []int {
 	return ix
 }
 
+// process one sequence, runs concurrently with main loop.
 func processseq(seq []byte, genenum int) {
 
 	hashes := make([]rollinghash.Hash32, config.NumHash)
@@ -278,8 +282,8 @@ func harvest() {
 		wtrs = append(wtrs, wtr)
 	}
 
-	bb := bytes.Repeat([]byte(" "), lw)
-	bb[lw-1] = byte('\n')
+	bb := bytes.Repeat([]byte(" "), bufsize)
+	bb[bufsize-1] = byte('\n')
 
 	for r := range hitchan {
 
@@ -299,11 +303,11 @@ func harvest() {
 		}
 
 		n := n1 + n2 + n3 + n4 + n5
-		if n > lw {
+		if n > bufsize {
 			panic("output line is too long")
 		}
 
-		_, err := wtr.Write(bb[n:lw])
+		_, err := wtr.Write(bb[n:bufsize])
 		if err != nil {
 			logger.Print(err)
 			panic(err)
@@ -311,6 +315,9 @@ func harvest() {
 	}
 }
 
+// search loops through the target sequences, checking each window
+// within each target gene for possible matches to the read
+// collection.
 func search() {
 
 	fid, err := os.Open(config.GeneFileName)
@@ -338,16 +345,17 @@ func search() {
 		}
 
 		line := scanner.Text() // need a copy here
-		if err := scanner.Err(); err != nil {
-			logger.Print(err)
-			panic(err)
-		}
 
 		toks := strings.Split(line, "\t")
-		seq := toks[0]
+		seq := toks[0] // The sequence
 
 		limit <- true
 		go processseq([]byte(seq), i)
+	}
+
+	if err := scanner.Err(); err != nil {
+		logger.Print(err)
+		panic(err)
 	}
 
 	for k := 0; k < concurrency; k++ {

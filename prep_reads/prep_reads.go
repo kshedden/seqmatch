@@ -22,8 +22,8 @@ var (
 
 func source() {
 
+	// File for read sequences
 	outfile := path.Join(tmpdir, "reads.txt.sz")
-
 	out, err := os.Create(outfile)
 	if err != nil {
 		panic(err)
@@ -32,9 +32,20 @@ func source() {
 	outw := snappy.NewBufferedWriter(out)
 	defer outw.Close()
 
+	// File for read names
+	namesoutfile := path.Join(tmpdir, "read_names.txt.sz")
+	namesout, err := os.Create(namesoutfile)
+	if err != nil {
+		panic(err)
+	}
+	defer namesout.Close()
+	namesoutw := snappy.NewBufferedWriter(namesout)
+	defer namesoutw.Close()
+
 	ris := utils.NewReadInSeq(config.ReadFileName, "")
 
-	for lnum := 0; ris.Next(); lnum++ {
+	var lnum int
+	for lnum = 0; ris.Next(); lnum++ {
 
 		if lnum%1000000 == 0 {
 			logger.Printf("sources: %d\n", lnum)
@@ -69,8 +80,19 @@ func source() {
 		if err != nil {
 			panic(err)
 		}
+
+		_, err = namesoutw.Write([]byte(ris.Name))
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = namesoutw.Write([]byte("\n"))
+		if err != nil {
+			panic(err)
+		}
 	}
 
+	logger.Printf("Processed %d reads", lnum)
 	logger.Printf("Done with sources")
 }
 
