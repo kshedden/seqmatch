@@ -85,16 +85,16 @@ func sortsource() {
 	cmd1 := exec.Command("sort", "-S", "2G", "--parallel=8", pname1)
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
+	pip, err := cmd1.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
 
 	err := cmd1.Start()
 	if err != nil {
 		panic(err)
 	}
 
-	pip, err := cmd1.StdoutPipe()
-	if err != nil {
-		panic(err)
-	}
 	scanner := bufio.NewScanner(pip)
 	buf := make([]byte, 1024*1024)
 	scanner.Buffer(buf, len(buf))
@@ -107,9 +107,12 @@ func sortsource() {
 	}
 	defer fid.Close()
 	wtr := snappy.NewBufferedWriter(fid)
-	defer wtr.Flush()
+	defer wtr.Close()
 
-	scanner.Scan()
+	if !scanner.Scan() {
+		logger.Printf("no input")
+		panic("no input")
+	}
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
