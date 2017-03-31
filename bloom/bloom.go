@@ -268,7 +268,8 @@ func processseq(seq []byte, genenum int) {
 // Retrieve the results and write to disk
 func harvest(wg *sync.WaitGroup) {
 
-	var wtrs, allwtrs []io.Writer
+	var wtrs []io.Writer
+	var allwtrs []io.Closer
 	for k := 0; k < len(config.Windows); k++ {
 		f := fmt.Sprintf("bmatch_%d.txt.sz", k)
 		outname := path.Join(tmpdir, f)
@@ -282,7 +283,7 @@ func harvest(wg *sync.WaitGroup) {
 		allwtrs = append(allwtrs, wtr, out)
 	}
 
-	bb := bytes.Repeat(byte(' '), bufsize)
+	bb := bytes.Repeat([]byte(" "), bufsize)
 	bb[bufsize-1] = byte('\n')
 
 	for r := range hitchan {
