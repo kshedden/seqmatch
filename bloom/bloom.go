@@ -99,7 +99,8 @@ func buildBloom() {
 			logger.Printf("%d\n", j)
 		}
 
-		seq := scanner.Bytes()
+		line := scanner.Bytes()
+		seq := bytes.Fields(line)[0]
 
 		for k := 0; k < len(config.Windows); k++ {
 			q1 := config.Windows[k]

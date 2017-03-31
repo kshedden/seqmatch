@@ -110,17 +110,6 @@ func sortsource() {
 	wtr := snappy.NewBufferedWriter(fid)
 	defer wtr.Close()
 
-	// File for counts/names
-	outname = path.Join(tmpdir, "reads_sorted_ids.txt.sz")
-	logger.Printf("Writing names to %s", outname)
-	fid, err = os.Create(outname)
-	if err != nil {
-		panic(err)
-	}
-	defer fid.Close()
-	nameswtr := snappy.NewBufferedWriter(fid)
-	defer nameswtr.Close()
-
 	// Get the first line
 	if !scanner.Scan() {
 		logger.Printf("no input")
@@ -139,12 +128,12 @@ func sortsource() {
 		if err != nil {
 			panic(err)
 		}
-		_, err = wtr.Write([]byte("\n"))
+		_, err = wtr.Write([]byte("\t"))
 		if err != nil {
 			panic(err)
 		}
-		s := fmt.Sprintf("%d %s\n", n, name)
-		_, err = nameswtr.Write([]byte(s))
+		s := fmt.Sprintf("%d\t%s\n", n, name)
+		_, err = wtr.Write([]byte(s))
 		if err != nil {
 			panic(err)
 		}

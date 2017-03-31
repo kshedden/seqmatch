@@ -92,7 +92,8 @@ func main() {
 			logger.Printf("%d\n", jj)
 		}
 
-		seq := scanner.Bytes() // don't need copy
+		line := scanner.Bytes() // don't need copy
+		seq := bytes.Fields(line)[0]
 
 		var bbuf bytes.Buffer
 		for k := 0; k < len(config.Windows); k++ {

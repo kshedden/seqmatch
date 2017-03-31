@@ -110,7 +110,7 @@ type breader struct {
 	// The current line number in the input file
 	lnum int
 
-	// The ame of the source of sequences (either "match" or
+	// The name of the source of sequences (either "match" or
 	// "source").
 	name string
 
@@ -231,7 +231,6 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			stag = srec.fields[0] // must equal mtag
 			slft := srec.fields[1]
 			srgt := srec.fields[2]
-			scnt := srec.fields[3]
 
 			nmiss := int((1 - config.PMatch) * float64(len(stag)+len(slft)+len(srgt)))
 
@@ -265,7 +264,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			bbuf.Write(mlft)
 			bbuf.Write(mtag)
 			bbuf.Write(mrgt[0:mk])
-			x := fmt.Sprintf("\t%d\t%s\t%s\n", mposi-len(mlft), scnt, mgene)
+			x := fmt.Sprintf("\t%d\t%s\n", mposi-len(mlft), mgene)
 			bbuf.Write([]byte(x))
 			rsltChan <- bbuf.Bytes()
 
