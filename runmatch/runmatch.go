@@ -503,11 +503,13 @@ func joinreadnames() {
 		panic(err)
 	}
 	defer fid.Close()
+	wtr := bufio.NewWriter(fid)
+	defer wtr.Flush()
 
-	cmd2 := exec.Command("join", pnamem, pnamer, "-1", "1", "-2", "1")
+	cmd2 := exec.Command("join", name, pnamer, "-1", "1", "-2", "1")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
-	cmd2.Stdout = fid
+	cmd2.Stdout = wtr
 
 	cmds := []*exec.Cmd{cmd1, cmd2}
 
