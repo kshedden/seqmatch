@@ -490,7 +490,8 @@ func joinreadnames() {
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
 	logger.Printf("A")
-	cmd1.Stdout, err = os.OpenFile(name, os.O_RDWR, 0600)
+	fif, err := os.OpenFile(name, os.O_RDWR, 0600)
+	cmd1.Stdout = fif
 	logger.Printf("B")
 	if err != nil {
 		panic(err)
@@ -522,11 +523,16 @@ func joinreadnames() {
 	}
 
 	logger.Printf("E")
-	for _, c := range cmds {
-		err := c.Wait()
-		if err != nil {
-			panic(err)
-		}
+	err = cmd1.Wait()
+	if err != nil {
+		panic(err)
+	}
+	fif.Close()
+
+	logger.Printf("F")
+	err = cmd2.Wait()
+	if err != nil {
+		panic(err)
 	}
 
 	logger.Printf("joinreadnames done")
