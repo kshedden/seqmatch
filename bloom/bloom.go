@@ -72,7 +72,7 @@ func genTables() {
 	}
 }
 
-// buildBloom constructs bloom filters for each window, and
+// buildBloom constructs bloom filters for each window
 func buildBloom() {
 
 	hashes := make([]rollinghash.Hash32, config.NumHash)
@@ -90,6 +90,7 @@ func buildBloom() {
 	snr := snappy.NewReader(fid)
 	scanner := bufio.NewScanner(snr)
 
+	// Workspace for sequence diversity checker
 	wk := make([]int, 25)
 
 	for j := 0; scanner.Scan(); j++ {
@@ -98,9 +99,7 @@ func buildBloom() {
 			logger.Printf("%d\n", j)
 		}
 
-		line := scanner.Bytes()
-		toks := bytes.Fields(line)
-		seq := toks[1]
+		seq := scanner.Bytes()
 
 		for k := 0; k < len(config.Windows); k++ {
 			q1 := config.Windows[k]
