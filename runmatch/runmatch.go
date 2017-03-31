@@ -511,6 +511,7 @@ func joinreadnames() {
 
 	cmds := []*exec.Cmd{cmd1, cmd2}
 
+	logger.Printf("C")
 	for _, c := range cmds {
 		err := c.Start()
 		if err != nil {
@@ -518,6 +519,7 @@ func joinreadnames() {
 		}
 	}
 
+	logger.Printf("E")
 	for _, c := range cmds {
 		err := c.Wait()
 		if err != nil {
