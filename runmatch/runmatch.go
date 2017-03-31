@@ -326,7 +326,7 @@ func combinewindows() {
 	var cmds []*exec.Cmd
 
 	// Pipe everything into one sort/unique
-	c0 := exec.Command("sort", "-u", "-")
+	c0 := exec.Command("sort", "-S", "2G", "--parallel=8", "-u", "-")
 	c0.Env = os.Environ()
 	c0.Stderr = os.Stderr
 
@@ -386,7 +386,7 @@ func sortbygeneid() {
 	cmd1 := exec.Command("sztool", "-d", inname)
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
-	cmd2 := exec.Command("sort", "-k 5", "-")
+	cmd2 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k4", "-")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	var err error
