@@ -486,7 +486,7 @@ func joinreadnames() {
 	}
 
 	// Sort the matches
-	cmd1 := exec.Command("sort", "-S", "-2G", "--parallel=8", "-k1", pnamem)
+	cmd1 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k1", pnamem)
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
 	logger.Printf("A")
