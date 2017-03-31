@@ -490,7 +490,7 @@ func joinreadnames() {
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
 	logger.Printf("A")
-	cmd1.Stdout, err = os.Open(name)
+	cmd1.Stdout, err = os.OpenFile(name, os.O_RDWR, 0600)
 	logger.Printf("B")
 	if err != nil {
 		panic(err)
