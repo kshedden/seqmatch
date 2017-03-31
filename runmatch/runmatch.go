@@ -90,7 +90,7 @@ func sortsource() {
 		panic(err)
 	}
 
-	err := cmd1.Start()
+	err = cmd1.Start()
 	if err != nil {
 		panic(err)
 	}
