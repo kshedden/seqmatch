@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
 	"golang.org/x/sys/unix"
 )
@@ -80,43 +82,77 @@ func sortsource() {
 	pname1 := pipefromsz(fname)
 	logger.Printf("Reading from %s", fname)
 
-	cmd2 := exec.Command("sort", "-S", "2G", "--parallel=8", pname1)
-	cmd2.Env = os.Environ()
-	cmd2.Stderr = os.Stderr
+	cmd1 := exec.Command("sort", "-S", "2G", "--parallel=8", pname1)
+	cmd1.Env = os.Environ()
+	cmd1.Stderr = os.Stderr
 
-	cmd3 := exec.Command("uniq", "-c")
-	cmd3.Env = os.Environ()
-	cmd3.Stderr = os.Stderr
-	var err error
-	cmd3.Stdin, err = cmd2.StdoutPipe()
+	err := cmd1.Start()
 	if err != nil {
 		panic(err)
 	}
+
+	pip, err := cmd1.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
+	scanner := bufio.NewScanner(pip)
+	buf := make([]byte, 1024*1024)
+	scanner.Buffer(buf, len(buf))
 
 	outname := path.Join(tmpdir, "reads_sorted.txt.sz")
 	logger.Printf("Writing to %s", outname)
-	cmd4 := exec.Command("sztool", "-c", "-", outname)
-	cmd4.Env = os.Environ()
-	cmd4.Stderr = os.Stderr
-	cmd4.Stdin, err = cmd3.StdoutPipe()
+	fid, err := os.Create(outname)
 	if err != nil {
 		panic(err)
 	}
+	defer fid.Close()
+	wtr := snappy.NewBufferedWriter(fid)
+	defer wtr.Flush()
 
-	cmds := []*exec.Cmd{cmd2, cmd3, cmd4}
+	scanner.Scan()
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
+	fields := strings.Fields(scanner.Text())
+	seq := fields[0]
+	name := fields[1]
+	n := 1
 
-	for _, c := range cmds {
-		err = c.Start()
+	dowrite := func(seq, name string, n int) {
+		_, err = wtr.Write([]byte(seq))
+		if err != nil {
+			panic(err)
+		}
+		s := fmt.Sprintf(" %d %s\n", n, name)
+		_, err = wtr.Write([]byte(s))
 		if err != nil {
 			panic(err)
 		}
 	}
-	logger.Printf("Started all commands")
-	for _, c := range cmds {
-		err = c.Wait()
-		if err != nil {
-			panic(err)
+
+	for scanner.Scan() {
+
+		line := scanner.Text()
+		fields1 := strings.Fields(line)
+		seq1 := fields1[0]
+		name1 := fields1[1]
+
+		if strings.Compare(seq, seq1) == 0 {
+			n++
+			name = fmt.Sprintf("%s;%s", name, name1)
+			continue
 		}
+
+		dowrite(seq, name, n)
+		seq = seq1
+		name = name1
+		n = 1
+	}
+
+	dowrite(seq, name, n)
+
+	if err := scanner.Err(); err != nil {
+		panic(err)
 	}
 
 	logger.Printf("sortsource done")

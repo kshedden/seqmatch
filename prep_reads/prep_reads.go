@@ -32,16 +32,6 @@ func source() {
 	outw := snappy.NewBufferedWriter(out)
 	defer outw.Close()
 
-	// File for read names
-	namesoutfile := path.Join(tmpdir, "read_names.txt.sz")
-	namesout, err := os.Create(namesoutfile)
-	if err != nil {
-		panic(err)
-	}
-	defer namesout.Close()
-	namesoutw := snappy.NewBufferedWriter(namesout)
-	defer namesoutw.Close()
-
 	ris := utils.NewReadInSeq(config.ReadFileName, "")
 
 	var lnum int
@@ -76,17 +66,17 @@ func source() {
 			panic(err)
 		}
 
+		_, err = outw.Write([]byte("\t"))
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = outw.Write([]byte(ris.Name))
+		if err != nil {
+			panic(err)
+		}
+
 		_, err = outw.Write([]byte("\n"))
-		if err != nil {
-			panic(err)
-		}
-
-		_, err = namesoutw.Write([]byte(ris.Name))
-		if err != nil {
-			panic(err)
-		}
-
-		_, err = namesoutw.Write([]byte("\n"))
 		if err != nil {
 			panic(err)
 		}
