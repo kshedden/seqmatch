@@ -478,7 +478,7 @@ func joinreadnames() {
 	rfname := path.Join(tmpdir, "reads_sorted.txt.sz")
 	pnamer := pipefromsz(rfname)
 
-	// Pipe to accept the sorted mathes
+	// Pipe to accept the sorted matches
 	name := pipename()
 	err := unix.Mkfifo(name, 0755)
 	if err != nil {
@@ -489,23 +489,24 @@ func joinreadnames() {
 	cmd1 := exec.Command("sort", "-S", "-2G", "--parallel=8", "-k1", pnamem)
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
-	fid, err := os.Open(name)
+	logger.Printf("A")
+	cmd1.Stdout, err = os.Open(name)
+	logger.Printf("B")
 	if err != nil {
 		panic(err)
 	}
-	cmd1.Stdout = fid
-
-	cmd2 := exec.Command("join", pnamem, pnamer, "-1", "1", "-2", "1")
-	cmd2.Env = os.Environ()
-	cmd2.Stderr = os.Stderr
 
 	// Output file
 	outname := path.Join(tmpdir, "matches.txt")
-	fid, err = os.Create(outname)
+	fid, err := os.Create(outname)
 	if err != nil {
 		panic(err)
 	}
 	defer fid.Close()
+
+	cmd2 := exec.Command("join", pnamem, pnamer, "-1", "1", "-2", "1")
+	cmd2.Env = os.Environ()
+	cmd2.Stderr = os.Stderr
 	cmd2.Stdout = fid
 
 	cmds := []*exec.Cmd{cmd1, cmd2}
