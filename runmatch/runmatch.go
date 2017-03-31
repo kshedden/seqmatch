@@ -427,7 +427,7 @@ func joingenenames() {
 	pname1 := pipefromsz(inname)
 	pname2 := pipefromsz(config.GeneIdFileName)
 
-	cmd1 := exec.Command("join", pname1, pname2, "-1", "5", "-2", "1")
+	cmd1 := exec.Command("join", pname1, pname2, "-1", "4", "-2", "1")
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
 
@@ -438,9 +438,70 @@ func joingenenames() {
 	pi, err := cmd1.StdoutPipe()
 	cmd2.Stdin = pi
 
-	outname := fmt.Sprintf("_%.0f_matches.txt", 100*config.PMatch)
-	outname = strings.Replace(config.ReadFileName, ".fastq", outname, 1)
+	// Output file
+	outname := path.Join(tmpdir, "matches_sn.txt.sz")
 	fid, err := os.Create(outname)
+	if err != nil {
+		panic(err)
+	}
+	defer fid.Close()
+	wtr := snappy.NewBufferedWriter(fid)
+	defer wtr.Close()
+	cmd2.Stdout = wtr
+
+	cmds := []*exec.Cmd{cmd1, cmd2}
+
+	for _, c := range cmds {
+		err := c.Start()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	for _, c := range cmds {
+		err := c.Wait()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	logger.Printf("joingenenames done")
+}
+
+func joinreadnames() {
+
+	logger.Printf("starting joinreadnames")
+
+	inname := path.Join(tmpdir, "matches_sn.txt.sz")
+	pnamem := pipefromsz(inname)
+
+	rfname := path.Join(tmpdir, "reads_sorted.txt.sz")
+	pnamer := pipefromsz(rfname)
+
+	// Pipe to accept the sorted mathes
+	name := pipename()
+	err := unix.Mkfifo(name, 0755)
+	if err != nil {
+		panic(err)
+	}
+
+	// Sort the matches
+	cmd1 := exec.Command("sort", "-S", "-2G", "--parallel=8", "-k1", pnamem)
+	cmd1.Env = os.Environ()
+	cmd1.Stderr = os.Stderr
+	fid, err := os.Open(name)
+	if err != nil {
+		panic(err)
+	}
+	cmd1.Stdout = fid
+
+	cmd2 := exec.Command("join", pnamem, pnamer, "-1", "1", "-2", "1")
+	cmd2.Env = os.Environ()
+	cmd2.Stderr = os.Stderr
+
+	// Output file
+	outname := path.Join(tmpdir, "matches.txt")
+	fid, err = os.Create(outname)
 	if err != nil {
 		panic(err)
 	}
@@ -463,7 +524,7 @@ func joingenenames() {
 		}
 	}
 
-	logger.Printf("joingenenames done")
+	logger.Printf("joinreadnames done")
 }
 
 func setupLog() {
@@ -594,6 +655,10 @@ func main() {
 
 	if startpoint <= 9 {
 		joingenenames()
+	}
+
+	if startpoint <= 10 {
+		joinreadnames()
 	}
 
 	logger.Printf("All done, exiting")
