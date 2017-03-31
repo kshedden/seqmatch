@@ -92,10 +92,7 @@ func main() {
 			logger.Printf("%d\n", jj)
 		}
 
-		line := scanner.Bytes() // don't need copy
-		toks := bytes.Fields(line)
-		seq := toks[1]
-		cnt := toks[0]
+		seq := scanner.Bytes() // don't need copy
 
 		var bbuf bytes.Buffer
 		for k := 0; k < len(config.Windows); k++ {
@@ -115,15 +112,13 @@ func main() {
 
 			bbuf.Reset()
 			_, err1 := bbuf.Write(key)
-			_, err2 := bbuf.Write([]byte("\t"))
+			_, err2 := bbuf.WriteString("\t")
 			_, err3 := bbuf.Write(seq[0:q1])
-			_, err4 := bbuf.Write([]byte("\t"))
+			_, err4 := bbuf.WriteString("\t")
 			_, err5 := bbuf.Write(seq[q2:len(seq)])
-			_, err6 := bbuf.Write([]byte("\t"))
-			_, err7 := bbuf.Write(cnt)
-			_, err8 := bbuf.Write([]byte("\n"))
+			_, err6 := bbuf.Write([]byte("\n"))
 
-			for _, e := range []error{err1, err2, err3, err4, err5, err6, err7, err8} {
+			for _, e := range []error{err1, err2, err3, err4, err5, err6} {
 				if e != nil {
 					logger.Print(e)
 					panic(e)

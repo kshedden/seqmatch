@@ -99,8 +99,9 @@ func sortsource() {
 	buf := make([]byte, 1024*1024)
 	scanner.Buffer(buf, len(buf))
 
+	// File for sequences
 	outname := path.Join(tmpdir, "reads_sorted.txt.sz")
-	logger.Printf("Writing to %s", outname)
+	logger.Printf("Writing sequences to %s", outname)
 	fid, err := os.Create(outname)
 	if err != nil {
 		panic(err)
@@ -109,6 +110,18 @@ func sortsource() {
 	wtr := snappy.NewBufferedWriter(fid)
 	defer wtr.Close()
 
+	// File for counts/names
+	outname = path.Join(tmpdir, "reads_sorted_ids.txt.sz")
+	logger.Printf("Writing names to %s", outname)
+	fid, err = os.Create(outname)
+	if err != nil {
+		panic(err)
+	}
+	defer fid.Close()
+	nameswtr := snappy.NewBufferedWriter(fid)
+	defer nameswtr.Close()
+
+	// Get the first line
 	if !scanner.Scan() {
 		logger.Printf("no input")
 		panic("no input")
@@ -127,7 +140,7 @@ func sortsource() {
 			panic(err)
 		}
 		s := fmt.Sprintf(" %d %s\n", n, name)
-		_, err = wtr.Write([]byte(s))
+		_, err = nameswtr.Write([]byte(s))
 		if err != nil {
 			panic(err)
 		}
@@ -156,6 +169,10 @@ func sortsource() {
 
 	if err := scanner.Err(); err != nil {
 		panic(err)
+	}
+
+	if err := cmd1.Wait(); err != nil {
+		log.Fatal(err)
 	}
 
 	logger.Printf("sortsource done")
