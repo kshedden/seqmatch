@@ -139,7 +139,11 @@ func sortsource() {
 		if err != nil {
 			panic(err)
 		}
-		s := fmt.Sprintf(" %d %s\n", n, name)
+		_, err = wtr.Write([]byte("\n"))
+		if err != nil {
+			panic(err)
+		}
+		s := fmt.Sprintf("%d %s\n", n, name)
 		_, err = nameswtr.Write([]byte(s))
 		if err != nil {
 			panic(err)
