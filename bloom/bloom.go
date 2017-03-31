@@ -268,7 +268,7 @@ func processseq(seq []byte, genenum int) {
 // Retrieve the results and write to disk
 func harvest(wg *sync.WaitGroup) {
 
-	var wtrs []io.Writer
+	var wtrs, allwtrs []io.Writer
 	for k := 0; k < len(config.Windows); k++ {
 		f := fmt.Sprintf("bmatch_%d.txt.sz", k)
 		outname := path.Join(tmpdir, f)
@@ -277,13 +277,12 @@ func harvest(wg *sync.WaitGroup) {
 			logger.Print(err)
 			panic(err)
 		}
-		defer out.Close()
 		wtr := snappy.NewBufferedWriter(out)
-		defer wtr.Close()
 		wtrs = append(wtrs, wtr)
+		allwtrs = append(allwtrs, wtr, out)
 	}
 
-	bb := bytes.Repeat([]byte(" "), bufsize)
+	bb := bytes.Repeat(byte(' '), bufsize)
 	bb[bufsize-1] = byte('\n')
 
 	for r := range hitchan {
@@ -308,6 +307,7 @@ func harvest(wg *sync.WaitGroup) {
 			panic("output line is too long")
 		}
 
+		// The rest of the line is spaces, then newline.
 		_, err := wtr.Write(bb[n:bufsize])
 		if err != nil {
 			logger.Print(err)
@@ -315,6 +315,9 @@ func harvest(wg *sync.WaitGroup) {
 		}
 	}
 
+	for _, wtr := range allwtrs {
+		wtr.Close()
+	}
 	wg.Done()
 	logger.Printf("Exiting harvest")
 }
