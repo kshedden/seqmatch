@@ -16,6 +16,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/chmduquesne/rollinghash"
 	"github.com/chmduquesne/rollinghash/buzhash32"
@@ -265,7 +266,7 @@ func processseq(seq []byte, genenum int) {
 }
 
 // Retrieve the results and write to disk
-func harvest() {
+func harvest(wg *sync.WaitGroup) {
 
 	var wtrs []io.Writer
 	for k := 0; k < len(config.Windows); k++ {
@@ -313,6 +314,9 @@ func harvest() {
 			panic(err)
 		}
 	}
+
+	wg.Done()
+	logger.Printf("Exiting harvest")
 }
 
 // search loops through the target sequences, checking each window
@@ -336,7 +340,9 @@ func search() {
 	hitchan = make(chan rec)
 	limit = make(chan bool, concurrency)
 
-	go harvest()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go harvest(&wg)
 
 	for i := 0; scanner.Scan(); i++ {
 
@@ -363,6 +369,7 @@ func search() {
 	}
 
 	close(hitchan)
+	wg.Wait()
 	logger.Printf("done with search")
 }
 
