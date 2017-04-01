@@ -496,7 +496,9 @@ func joinreadnames() {
 	}
 
 	// Output file
-	outname := path.Join(tmpdir, "matches.txt")
+	_, outname := path.Split(config.ReadFileName)
+	s := fmt.Sprintf("_%.0f_%d_%d", 100*config.PMatch, len(config.Windows), config.WindowWidth)
+	outname = strings.Replace(outname, ".fastq", s, 1)
 	fid, err := os.Create(outname)
 	if err != nil {
 		panic(err)
