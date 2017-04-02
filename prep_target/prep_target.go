@@ -10,28 +10,33 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/golang/snappy"
-	"github.com/kshedden/seqmatch/utils"
+)
+
+const (
+	maxline int = 1024 * 1024
 )
 
 var (
 	logger *log.Logger
-
-	config *utils.Config
 )
 
-func targets(sourcefile string) {
+func targets(genefile string) {
 
 	// Setup for reading the input file
-	inf, err := os.Open(sourcefile)
+	inf, err := os.Open(genefile)
 	if err != nil {
 		panic(err)
 	}
 	defer inf.Close()
 
 	// Setup for writing the sequence output
-	gid1, err := os.Create(config.GeneFileName)
+	ext := filepath.Ext(genefile)
+	geneoutfile := strings.Replace(genefile, ext, ".txt.sz", 1)
+	gid1, err := os.Create(geneoutfile)
 	if err != nil {
 		panic(err)
 	}
@@ -40,7 +45,8 @@ func targets(sourcefile string) {
 	defer seqout.Close()
 
 	// Setup for writing the identifier output
-	gid2, err := os.Create(config.GeneIdFileName)
+	geneidfile := strings.Replace(genefile, ext, "_ids.txt.sz", 1)
+	gid2, err := os.Create(geneidfile)
 	if err != nil {
 		panic(err)
 	}
@@ -50,8 +56,8 @@ func targets(sourcefile string) {
 
 	// Setup a scanner to read long lines
 	scanner := bufio.NewScanner(inf)
-	sbuf := make([]byte, 1024*1024)
-	scanner.Buffer(sbuf, 1024*1024)
+	sbuf := make([]byte, maxline)
+	scanner.Buffer(sbuf, maxline)
 
 	for lnum := 0; scanner.Scan(); lnum++ {
 
@@ -118,14 +124,11 @@ func setupLog() {
 
 func main() {
 
-	if len(os.Args) != 3 {
+	if len(os.Args) != 2 {
 		panic("wrong number of arguments")
 	}
 
-	jsonfile := os.Args[1]
-	config = utils.ReadConfig(jsonfile)
-
-	genefile := os.Args[2]
+	genefile := os.Args[1]
 
 	setupLog()
 
