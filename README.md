@@ -16,10 +16,14 @@ install.sh`.
   scripts to contain your email address and Flux account.
 
 * Edit the file name in `prep_target.pbs` to point to the gene data
-  file.  Then type `qsub prep_target.pbs` and wait for this script to
-  complete before proceeding (it takes under one hour).  Note that
-  this script only needs to be run when the gene database changes, it
-  does not utilize the sequencing read files at all.
+  file.  The gene data file must be a text file, with each line having
+  format "identifier tab sequence newline".  Then type `qsub
+  prep_target.pbs` and wait for this script to complete before
+  proceeding.  Note that this script only needs to be run when the
+  gene database changes, it does not utilize the sequencing read files
+  at all.  If the gene data file has name `genes.txt`, the output
+  files for this script are `genes.txt.sz` and `genes_ids.txt.sz`.
+  You will need these file names to pass into the next step, below.
 
 * Edit the `config.json` file to contain the proper paths for the read
   and gene files (the gene file name should be the output file of the
