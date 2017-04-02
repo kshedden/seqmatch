@@ -24,11 +24,13 @@ install.sh`.
 * Edit the `config.json` file to contain the proper paths for the read
   and gene files (the gene file name should be the output file of the
   previous step).  Then adjust the run parameters if desired, and run
-  `qsub run.pbs --ConfigFileName=config.json` to fully process one
-  read file.  This currently takes around five hours (for around 90M
-  distinct reads and 60M distinct genes, using 20 hashes, and PMatch
-  around 0.9-1).  Alternatively, the parameters can be passed as
-  flags, as discussed below.
+
+  `qsub run.pbs --ConfigFileName=config.json`
+
+  to fully process one read file.  This currently takes around five
+  hours (for around 90M distinct reads and 60M distinct genes, using
+  20 hashes, and PMatch around 0.9-1).  Alternatively, the parameters
+  can be passed using command-line flags, as discussed below.
 
 __Goal and approach__
 
@@ -47,12 +49,14 @@ will generally be longer.
 
 The approach uses [Bloom
 filtering](https://en.wikipedia.org/wiki/Bloom_filter), [rolling
-hashes](https://en.wikipedia.org/wiki/Rolling_hash), and [external
-merging](https://en.wikipedia.org/wiki/External_sorting) to accomplish
-this goal with modest memory requirements and reasonable run-time.
-For example, around 6GB of RAM should be sufficient for 100 million
-reads and 60 million target gene sequences, and the results will be
-complete in around 5 hours when using 10 cores.
+hashes](https://en.wikipedia.org/wiki/Rolling_hash), [external
+merging](https://en.wikipedia.org/wiki/External_sorting) and
+[concurrent
+processing](https://en.wikipedia.org/wiki/Concurrent_computing) to
+accomplish this goal with modest memory requirements and reasonable
+run-time.  For example, around 6GB of RAM should be sufficient for 100
+million reads and 60 million target gene sequences, and the results
+will be complete in around 5 hours when using 10 cores.
 
 The user provides a parameter `WindowWidth` (for the width of the
 exact matching window), and a list of left endpoints for these
