@@ -24,9 +24,11 @@ install.sh`.
 * Edit the `config.json` file to contain the proper paths for the read
   and gene files (the gene file name should be the output file of the
   previous step).  Then adjust the run parameters if desired, and run
-  `qsub run.pbs` to fully process one read file.  This currently takes
-  around five hours (for around 90M distinct reads and 60M distinct
-  genes, using 20 hashes, and PMatch around 0.9-1).
+  `qsub run.pbs --ConfigFileName=config.json` to fully process one
+  read file.  This currently takes around five hours (for around 90M
+  distinct reads and 60M distinct genes, using 20 hashes, and PMatch
+  around 0.9-1).  Alternatively, the parameters can be passed as
+  flags, as discussed below.
 
 __Goal and approach__
 
@@ -64,7 +66,8 @@ exceeds the value given by the parameter `PMatch`.
 
 __Configurable parameters__
 
-Some parameters can be configured in the `config.json` file:
+Some parameters can be configured in the `config.json` file, or set
+using command-line flags as shown below.
 
 * ReadFileName: A file containing sequencing reads in fastq format.
 
@@ -102,6 +105,24 @@ in a gene.
 
 A rule of thumb would be to set `BloomSize` equal to twice the number
 of reads times `NumHash`.
+
+Each of these parameter names can be used to provide a value via a
+command-line flag.  For example,
+
+```
+runmatch --ConfigFileName=config.json --NumHash=30
+```
+
+runs the code using the `config.json` parameters, except that the
+value of `NumHash` is changed to 30.  Alternatively, all the
+parameters can be specified via flags, omitting the `config.json` file
+entirely, e.g.
+
+```
+runmatch --ReadFileName=reads.fasta --GeneFileName=genes.txt.sz --GeneIdFileName=genenames.txt.sz\
+    --Windows=10,20,30 --WindowWidth=20 --BloomSize=4000000000 --NumHash=20 --PMatch=0.9\
+    --MinDinuc=5 --MinReadLength=50 --MaxMatches=10 --MaxMergeProcs=3
+```
 
 __Logging__
 

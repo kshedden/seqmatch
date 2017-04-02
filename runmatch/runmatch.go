@@ -644,43 +644,43 @@ func handleArgs() {
 func checkArgs() {
 
 	if config.ReadFileName == "" {
-		os.Stderr.WriteString("ReadFileName not provided")
+		os.Stderr.WriteString("ReadFileName not provided\n")
 		os.Exit(1)
 	}
 	if config.GeneFileName == "" {
-		os.Stderr.WriteString("GeneFileName not provided")
+		os.Stderr.WriteString("GeneFileName not provided\n")
 		os.Exit(1)
 	}
 	if config.GeneIdFileName == "" {
-		os.Stderr.WriteString("GeneIdFileName not provided")
+		os.Stderr.WriteString("GeneIdFileName not provided\n")
 		os.Exit(1)
 	}
 	if len(config.Windows) == 0 {
-		os.Stderr.WriteString("Windows not provided")
+		os.Stderr.WriteString("Windows not provided\n")
 		os.Exit(1)
 	}
 	if config.WindowWidth == 0 {
-		os.Stderr.WriteString("WindowWidth not provided")
+		os.Stderr.WriteString("WindowWidth not provided\n")
 		os.Exit(1)
 	}
 	if config.BloomSize == 0 {
-		os.Stderr.WriteString("BloomSize not provided")
+		os.Stderr.WriteString("BloomSize not provided\n")
 		os.Exit(1)
 	}
 	if config.NumHash == 0 {
-		os.Stderr.WriteString("NumHash not provided")
+		os.Stderr.WriteString("NumHash not provided\n")
 		os.Exit(1)
 	}
 	if config.PMatch == 0 {
-		os.Stderr.WriteString("PMatch not provided")
+		os.Stderr.WriteString("PMatch not provided\n")
 		os.Exit(1)
 	}
 	if config.MaxMatches == 0 {
-		os.Stderr.WriteString("MaxMMatches not provided")
+		os.Stderr.WriteString("MaxMatches not provided\n")
 		os.Exit(1)
 	}
 	if config.MaxMergeProcs == 0 {
-		os.Stderr.WriteString("MaxMMatches not provided, defaulting to 3")
+		os.Stderr.WriteString("MaxMergeProcs not provided, defaulting to 3\n")
 		config.MaxMergeProcs = 3
 	}
 	if !strings.HasSuffix(config.ReadFileName, ".fastq") {
