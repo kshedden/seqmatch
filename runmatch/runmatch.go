@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -24,6 +25,7 @@ const ()
 
 var (
 	jsonfile    string
+	startpoint  int
 	tmpjsonfile string
 	config      *utils.Config
 	basename    string
@@ -559,12 +561,135 @@ func copyconfig(config *utils.Config, tmpdir string) {
 	tmpjsonfile = path.Join(tmpdir, "config.json")
 }
 
-func main() {
+func handleArgs() {
 
-	if len(os.Args) != 3 {
-		panic("wrong number of arguments")
+	ConfigFileName := flag.String("ConfigFileName", "", "JSON file containing configuration parameters")
+	ReadFileName := flag.String("ReadFileName", "", "Sequencing read file (fastq format)")
+	GeneFileName := flag.String("GeneFileName", "", "Gene file name (processed form)")
+	GeneIdFileName := flag.String("GeneIdFileName", "", "Gene ID file name (processed form)")
+	WindowsRaw := flag.String("Windows", "", "Starting position of each window")
+	WindowWidth := flag.Int("WindowWidth", 0, "Width of each window")
+	BloomSize := flag.Int("BloomSize", 0, "Size of Bloom filter, in bits")
+	NumHash := flag.Int("NumHash", 0, "Number of hashses")
+	PMatch := flag.Float64("PMatch", 0, "Required proportion of matching positions")
+	MinDinuc := flag.Int("MinDinuc", 0, "Minimum number of dinucleotides to check for match")
+	TempDir := flag.String("TempDir", "", "Workspace for temporary files")
+	MinReadLength := flag.Int("MinReadLength", 0, "Reads shorter than this length are skipped")
+	MaxMatches := flag.Int("MaxMatches", 0, "Return no more than this number of matches per window")
+	MaxMergeProcs := flag.Int("MaxMergeProcs", 0, "Run this number of merge processes concurrently")
+	StartPoint := flag.Int("StartPoint", 0, "Restart at a given point in the procedure")
+
+	flag.Parse()
+
+	if *ConfigFileName != "" {
+		jsonfile = *ConfigFileName
+		config = utils.ReadConfig(jsonfile)
+	} else {
+		config = new(utils.Config)
 	}
 
+	if *ReadFileName != "" {
+		config.ReadFileName = *ReadFileName
+	}
+	if *GeneFileName != "" {
+		config.GeneFileName = *GeneFileName
+	}
+	if *GeneIdFileName != "" {
+		config.GeneIdFileName = *GeneIdFileName
+	}
+	if *WindowWidth != 0 {
+		config.WindowWidth = *WindowWidth
+	}
+	if *BloomSize != 0 {
+		config.BloomSize = uint64(*BloomSize)
+	}
+	if *NumHash != 0 {
+		config.NumHash = *NumHash
+	}
+	if *PMatch != 0 {
+		config.PMatch = *PMatch
+	}
+	if *MinDinuc != 0 {
+		config.MinDinuc = *MinDinuc
+	}
+	if *TempDir != "" {
+		config.TempDir = *TempDir
+	}
+	if *MinReadLength != 0 {
+		config.MinReadLength = *MinReadLength
+	}
+	if *MaxMatches != 0 {
+		config.MaxMatches = *MaxMatches
+	}
+	if *MaxMergeProcs != 0 {
+		config.MaxMergeProcs = *MaxMergeProcs
+	}
+
+	startpoint = *StartPoint
+
+	if *WindowsRaw != "" {
+		toks := strings.Split(*WindowsRaw, ",")
+		var itoks []int
+		for _, x := range toks {
+			y, err := strconv.Atoi(x)
+			if err != nil {
+				panic(err)
+			}
+			itoks = append(itoks, y)
+		}
+		config.Windows = itoks
+	}
+}
+
+func checkArgs() {
+
+	if config.ReadFileName == "" {
+		os.Stderr.WriteString("ReadFileName not provided")
+		os.Exit(1)
+	}
+	if config.GeneFileName == "" {
+		os.Stderr.WriteString("GeneFileName not provided")
+		os.Exit(1)
+	}
+	if config.GeneIdFileName == "" {
+		os.Stderr.WriteString("GeneIdFileName not provided")
+		os.Exit(1)
+	}
+	if len(config.Windows) == 0 {
+		os.Stderr.WriteString("Windows not provided")
+		os.Exit(1)
+	}
+	if config.WindowWidth == 0 {
+		os.Stderr.WriteString("WindowWidth not provided")
+		os.Exit(1)
+	}
+	if config.BloomSize == 0 {
+		os.Stderr.WriteString("BloomSize not provided")
+		os.Exit(1)
+	}
+	if config.NumHash == 0 {
+		os.Stderr.WriteString("NumHash not provided")
+		os.Exit(1)
+	}
+	if config.PMatch == 0 {
+		os.Stderr.WriteString("PMatch not provided")
+		os.Exit(1)
+	}
+	if config.MaxMatches == 0 {
+		os.Stderr.WriteString("MaxMMatches not provided")
+		os.Exit(1)
+	}
+	if config.MaxMergeProcs == 0 {
+		os.Stderr.WriteString("MaxMMatches not provided, defaulting to 3")
+		config.MaxMergeProcs = 3
+	}
+	if !strings.HasSuffix(config.ReadFileName, ".fastq") {
+		msg := fmt.Sprintf("Warning: %s may not be a fastq file", config.ReadFileName)
+		os.Stderr.WriteString(msg)
+	}
+}
+
+func setupEnvs() {
 	err := os.Setenv("LC_ALL", "C")
 	if err != nil {
 		panic(err)
@@ -579,22 +704,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
 
-	jsonfile = os.Args[1]
-	config = utils.ReadConfig(jsonfile)
-
-	startpoint, err := strconv.Atoi(os.Args[2])
-	if err != nil {
-		print("can't determine starting point")
-		panic(err)
-	}
-
-	if !strings.HasSuffix(config.ReadFileName, ".fastq") {
-		panic("Invalid read file")
-	}
-
-	// Create the directory for all temporary files, if needed
+// Create the directory for all temporary files, if needed
+func makeTemp() {
 	var d string
+	var err error
 	d, basename = path.Split(config.ReadFileName)
 	if config.TempDir == "" {
 		d = path.Join(d, "tmp")
@@ -613,18 +728,15 @@ func main() {
 			panic(err)
 		}
 	}
-	copyconfig(config, tmpdir)
 
-	setupLog()
-
-	logger.Printf("Storing temporary files in %s", tmpdir)
 	pipedir = path.Join(tmpdir, "pipes")
-	logger.Printf("Storing pipes in %s", pipedir)
 	err = os.MkdirAll(pipedir, 0755)
 	if err != nil {
 		panic(err)
 	}
+}
 
+func run() {
 	if startpoint <= 0 {
 		compresssource()
 	}
@@ -668,6 +780,20 @@ func main() {
 	if startpoint <= 10 {
 		joinreadnames()
 	}
+}
+
+func main() {
+
+	handleArgs()
+	checkArgs()
+	setupEnvs()
+	makeTemp()
+	copyconfig(config, tmpdir)
+	setupLog()
+
+	logger.Printf("Storing temporary files in %s", tmpdir)
+
+	run()
 
 	logger.Printf("All done, exiting")
 }
