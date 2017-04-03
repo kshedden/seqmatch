@@ -93,6 +93,10 @@ using command-line flags as shown below.
 
 * Windows: The left edges of windows, one of which must match exactly.
 
+* MinReadLength: Reads shorter than this length are skipped.
+
+* MaxReadLength: Reads longer than this length are truncated.
+
 * MinDinuc: The minimum number of distinct dinucleotides that must be
 present in a read (or it is dropped).  This eliminates uninformative
 matches that take a lot of space and time to enumerate.
