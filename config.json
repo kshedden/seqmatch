@@ -5,6 +5,7 @@
     "Windows": [0, 15, 30],
     "WindowWidth": 30,
     "MinReadLength": 50,
+    "MaxReadLength": 150,
     "BloomSize": 4000000000,
     "NumHash": 20,
     "MinDinuc": 5,

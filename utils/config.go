@@ -42,6 +42,9 @@ type Config struct {
 	// Skip all reads shorter than this length.
 	MinReadLength int
 
+	// Truncate all reads at this length.
+	MaxReadLength int
+
 	// Return at most this many matches for each read, defaults to
 	// 1.
 	MaxMatches int
@@ -62,14 +65,6 @@ func ReadConfig(filename string) *Config {
 	err = dec.Decode(config)
 	if err != nil {
 		panic(err)
-	}
-
-	if config.MaxMatches == 0 {
-		config.MaxMatches = 1
-	}
-
-	if config.MaxMergeProcs == 0 {
-		config.MaxMergeProcs = 3
 	}
 
 	return config

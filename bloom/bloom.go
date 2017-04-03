@@ -28,9 +28,6 @@ import (
 const (
 	// Number of goroutines
 	concurrency int = 100
-
-	// Line length for output
-	bufsize int = 150
 )
 
 var (
@@ -54,6 +51,9 @@ var (
 
 	// Semaphore for limiting goroutines
 	limit chan bool
+
+	// Line length for output
+	bufsize int = 150
 )
 
 func genTables() {
@@ -244,7 +244,7 @@ func processseq(seq []byte, genenum int) {
 			jw := jx - q1
 
 			// Right tail is jy:jz
-			jz := jy + 100 - q2
+			jz := jy + config.MaxReadLength - q2
 			if jz > len(seq) {
 				// May not be long enough, but we don't know until we merge.
 				jz = len(seq)
@@ -420,6 +420,8 @@ func main() {
 	} else {
 		tmpdir = config.TempDir
 	}
+
+	bufsize = config.MaxReadLength + 50
 
 	setupLogger()
 	genTables()

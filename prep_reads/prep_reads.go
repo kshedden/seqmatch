@@ -61,6 +61,10 @@ func source() {
 			}
 		}
 
+		if len(xseq) > config.MaxReadLength {
+			xseq = xseq[0:config.MaxReadLength]
+		}
+
 		_, err := outw.Write(xseq)
 		if err != nil {
 			panic(err)

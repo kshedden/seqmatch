@@ -575,6 +575,7 @@ func handleArgs() {
 	MinDinuc := flag.Int("MinDinuc", 0, "Minimum number of dinucleotides to check for match")
 	TempDir := flag.String("TempDir", "", "Workspace for temporary files")
 	MinReadLength := flag.Int("MinReadLength", 0, "Reads shorter than this length are skipped")
+	MaxReadLength := flag.Int("MaxReadLength", 0, "Reads longer than this length are truncated")
 	MaxMatches := flag.Int("MaxMatches", 0, "Return no more than this number of matches per window")
 	MaxMergeProcs := flag.Int("MaxMergeProcs", 0, "Run this number of merge processes concurrently")
 	StartPoint := flag.Int("StartPoint", 0, "Restart at a given point in the procedure")
@@ -617,6 +618,9 @@ func handleArgs() {
 	}
 	if *MinReadLength != 0 {
 		config.MinReadLength = *MinReadLength
+	}
+	if *MaxReadLength != 0 {
+		config.MaxReadLength = *MaxReadLength
 	}
 	if *MaxMatches != 0 {
 		config.MaxMatches = *MaxMatches
@@ -673,6 +677,10 @@ func checkArgs() {
 	}
 	if config.PMatch == 0 {
 		os.Stderr.WriteString("PMatch not provided\n")
+		os.Exit(1)
+	}
+	if config.MaxReadLength == 0 {
+		os.Stderr.WriteString("MaxReadLength not provided\n")
 		os.Exit(1)
 	}
 	if config.MaxMatches == 0 {

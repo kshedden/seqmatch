@@ -22,14 +22,11 @@ import (
 )
 
 const (
-	// Needs to hold two reads
-	lw int = 300
-
 	concurrency = 100
 
 	profile = false
 
-	// Maintain a pool of byte arrays of length lw
+	// Maintain a pool of byte arrays of length bufsize
 	poolsize = 10000
 )
 
@@ -47,6 +44,8 @@ var (
 
 	// Pass results to driver then write to disk
 	rsltChan chan []byte
+
+	bufsize int = 300
 
 	alldone chan bool
 )
@@ -139,7 +138,7 @@ func (b *breader) Next() bool {
 
 		// Process a line
 		bb := b.scanner.Bytes()
-		if len(bb) > lw {
+		if len(bb) > bufsize {
 			logger.Print("line too long")
 			panic("line too long")
 		}
@@ -204,7 +203,7 @@ func getbuf() []byte {
 	case buf = <-pool:
 		buf = buf[0:0]
 	default:
-		buf = make([]byte, 0, lw)
+		buf = make([]byte, 0, bufsize)
 	}
 	return buf
 }
@@ -331,6 +330,8 @@ func main() {
 	} else {
 		tmpdir = config.TempDir
 	}
+
+	bufsize = 2*config.MaxReadLength + 50
 
 	var err error
 	win, err = strconv.Atoi(os.Args[2])
