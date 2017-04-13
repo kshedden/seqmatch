@@ -125,7 +125,10 @@ func setupLog() {
 func main() {
 
 	if len(os.Args) != 2 {
-		panic("wrong number of arguments")
+		os.Stderr.WriteString("prep_target: wrong number of arguments\n")
+		os.Stderr.WriteString("Usage:\n")
+		os.Stderr.WriteString("  prep_target genefile\n\n")
+		os.Exit(1)
 	}
 
 	genefile := os.Args[1]
