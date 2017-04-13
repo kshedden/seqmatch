@@ -101,7 +101,7 @@ func targets(genefile string) {
 		if err != nil {
 			panic(err)
 		}
-		_, err = idout.Write([]byte("\n"))
+		_, err = idout.Write([]byte(fmt.Sprintf(" %d\n", len(seq))))
 		if err != nil {
 			panic(err)
 		}
