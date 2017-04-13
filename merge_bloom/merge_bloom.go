@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"runtime/pprof"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -208,12 +209,21 @@ func getbuf() []byte {
 	return buf
 }
 
+type qrect struct {
+	mismatch int
+	gob      []byte
+}
+
 func searchpairs(source, match []*rec, limit chan bool) {
 
 	defer func() { <-limit }()
 	if len(match)*len(source) > 10000 {
 		logger.Printf("searching %d %d ...", len(match), len(source))
 	}
+
+	var qvals []*qrect
+
+	first := config.MatchMode == "first"
 
 	var stag []byte
 	for _, mrec := range match {
@@ -224,7 +234,6 @@ func searchpairs(source, match []*rec, limit chan bool) {
 		mgene := mrec.fields[3]
 		mpos := mrec.fields[4]
 
-		nhit := 0
 		for _, srec := range source {
 
 			stag = srec.fields[0] // must equal mtag
@@ -265,13 +274,43 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			bbuf.Write(mrgt[0:mk])
 			x := fmt.Sprintf("\t%d\t%s\n", mposi-len(mlft), mgene)
 			bbuf.Write([]byte(x))
-			rsltChan <- bbuf.Bytes()
 
-			nhit++
-			if nhit >= config.MaxMatches {
-				break
+			qq := &qrect{nx, bbuf.Bytes()}
+			if first {
+				qvals = append(qvals, qq)
+				if len(qvals) > config.MaxMatches {
+					goto E
+				}
+			} else {
+				f := func(i int) bool {
+					return qvals[i].mismatch > qq.mismatch
+				}
+				m := len(qvals)
+				if len(qvals) < config.MaxMatches {
+					if m == 0 {
+						qvals = append(qvals, qq)
+					} else {
+						j := sort.Search(m, f)
+						copy(qvals[j+1:m+1], qvals[j:m])
+						qvals[j] = qq
+					}
+				} else {
+					j := sort.Search(m, f)
+					if j < m-1 {
+						copy(qvals[j+1:m], qvals[j:m-1])
+					}
+					if j < m {
+						qvals[j] = qq
+					}
+				}
 			}
+
 		}
+	}
+
+E:
+	for _, v := range qvals {
+		rsltChan <- v.gob
 	}
 
 	if len(match)*len(source) > 10000 {

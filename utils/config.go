@@ -52,6 +52,12 @@ type Config struct {
 	// The maximum number of merge processes that are run
 	// simultaneously, defaults to 3.
 	MaxMergeProcs int
+
+	// Either "first" (default) or "best".  If first, returns the
+	// first MaxMatches matches for each window.  If best, returns
+	// the MaxMatches matches for each window with the fewest
+	// mismatched values.
+	MatchMode string
 }
 
 func ReadConfig(filename string) *Config {

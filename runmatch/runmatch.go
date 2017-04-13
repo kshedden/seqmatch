@@ -1,3 +1,7 @@
+// This is the entry point for all the scripts in this collection.
+// Normally, this is the only script that will be run directly.  It
+// calls the other scripts in turn.
+
 package main
 
 import (
@@ -20,8 +24,6 @@ import (
 	"github.com/kshedden/seqmatch/utils"
 	"golang.org/x/sys/unix"
 )
-
-const ()
 
 var (
 	jsonfile    string
@@ -51,6 +53,8 @@ func pipename() string {
 	return path.Join(pipedir, f)
 }
 
+// pipefromsz creates a fifo and starts decompressing the given snappy
+// file into it.
 func pipefromsz(fname string) string {
 
 	rand.Seed(int64(time.Now().UnixNano() + int64(os.Getpid())))
@@ -579,6 +583,7 @@ func handleArgs() {
 	MaxMatches := flag.Int("MaxMatches", 0, "Return no more than this number of matches per window")
 	MaxMergeProcs := flag.Int("MaxMergeProcs", 0, "Run this number of merge processes concurrently")
 	StartPoint := flag.Int("StartPoint", 0, "Restart at a given point in the procedure")
+	MatchMode := flag.String("MatchMode", "", "'first' (retain first matches meeting criteria) or 'best' (returns best matches meeting criteria)")
 
 	flag.Parse()
 
@@ -627,6 +632,9 @@ func handleArgs() {
 	}
 	if *MaxMergeProcs != 0 {
 		config.MaxMergeProcs = *MaxMergeProcs
+	}
+	if *MatchMode != "" {
+		config.MatchMode = *MatchMode
 	}
 
 	startpoint = *StartPoint
@@ -694,6 +702,10 @@ func checkArgs() {
 	if !strings.HasSuffix(config.ReadFileName, ".fastq") {
 		msg := fmt.Sprintf("Warning: %s may not be a fastq file", config.ReadFileName)
 		os.Stderr.WriteString(msg)
+	}
+	if config.MatchMode == "" {
+		os.Stderr.WriteString("MatchMode not provided, defaulting to 'first'\n")
+		config.MatchMode = "first"
 	}
 }
 

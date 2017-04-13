@@ -112,6 +112,12 @@ that need to match the read.
 * MaxMatches: The maximum number of mathches returned for each window
 in a gene.
 
+* MatchMode: Either `first` or `best`.  If `first`, for each window
+sequence, the first `MaxMatches` instances of a read match meeting the
+`PMatch` criterion are retained.  If `best`, the best `MaxMatches`
+read matches are returned, where "best" is based on having the minimum
+number of mismatching positions.
+
 * MaxMergeProcs: The maximum number of merge operations that are
   performed concurrently.
 
