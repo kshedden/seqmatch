@@ -240,6 +240,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			slft := srec.fields[1]
 			srgt := srec.fields[2]
 
+			// Allowed number of mismatches
 			nmiss := int((1 - config.PMatch) * float64(len(stag)+len(slft)+len(srgt)))
 
 			// Gene ends before read would end, can't match.
@@ -272,7 +273,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			bbuf.Write(mlft)
 			bbuf.Write(mtag)
 			bbuf.Write(mrgt[0:mk])
-			x := fmt.Sprintf("\t%d\t%s\n", mposi-len(mlft), mgene)
+			x := fmt.Sprintf("\t%d\t%d\t%s\n", mposi-len(mlft), nx, mgene)
 			bbuf.Write([]byte(x))
 
 			qq := &qrect{nx, bbuf.Bytes()}

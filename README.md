@@ -36,6 +36,22 @@ install.sh`.
   20 hashes, and PMatch around 0.9-1).  Alternatively, the parameters
   can be passed using command-line flags, as discussed below.
 
+* The output columns are as follows:
+
+1. Read sequence
+
+2. Matching subsequence of a target sequence
+
+3. Position within the target where the read matches (counting from 0)
+
+4. Target sequence identifier
+
+5. Target sequence length
+
+6. Number of copies of read in read pool
+
+7. Read identifier
+
 __Goal and approach__
 
 The goal is to find all approximate matches from a set of reads into a
