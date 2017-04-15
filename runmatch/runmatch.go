@@ -1,6 +1,8 @@
-// This is the entry point for all the scripts in this collection.
-// Normally, this is the only script that will be run directly.  It
-// calls the other scripts in turn.
+/*
+This is the entry point for all the scripts in this collection.
+Normally, this is the only script that will be run directly.  It calls
+the other scripts in turn.
+*/
 
 package main
 
@@ -325,29 +327,54 @@ func mergebloom() {
 	logger.Printf("mergebloom done")
 }
 
+func writebest(lines []string, bfr [][]string, wtr io.Writer, ibuf []int) []int {
+
+	ibuf = ibuf[0:0]
+	best := -1
+	for _, x := range bfr {
+		y, err := strconv.Atoi(x[3]) // 3 is position of nmiss
+		if err != nil {
+			panic(err)
+		}
+		if best == -1 || y < best {
+			best = y
+		}
+		ibuf = append(ibuf, y)
+	}
+
+	for i, x := range lines {
+		if ibuf[i] <= best+1 {
+			_, err := wtr.Write([]byte(x))
+			if err != nil {
+				panic(err)
+			}
+			_, err = wtr.Write([]byte("\n"))
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	return ibuf
+}
+
 func combinewindows() {
 
 	logger.Printf("starting combinewindows")
-
-	var cmds []*exec.Cmd
 
 	// Pipe everything into one sort/unique
 	c0 := exec.Command("sort", "-S", "2G", "--parallel=8", "-u", "-")
 	c0.Env = os.Environ()
 	c0.Stderr = os.Stderr
+	cmds := []*exec.Cmd{c0}
 
 	// The sorted results go to disk
 	outname := path.Join(tmpdir, "matches.txt.sz")
-	c1 := exec.Command("sztool", "-c", "-", outname)
-	c1.Env = os.Environ()
-	c1.Stderr = os.Stderr
-	var err error
-	c1.Stdin, err = c0.StdoutPipe()
+	out, err := os.Create(outname)
 	if err != nil {
 		panic(err)
 	}
-
-	cmds = append(cmds, c0, c1)
+	wtr := snappy.NewBufferedWriter(out)
 
 	var fd []io.Reader
 	for j := 0; j < len(config.Windows); j++ {
@@ -364,6 +391,10 @@ func combinewindows() {
 		fd = append(fd, p)
 	}
 	c0.Stdin = io.MultiReader(fd...)
+	da, err := c0.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
 
 	for _, c := range cmds {
 		err := c.Start()
@@ -372,12 +403,52 @@ func combinewindows() {
 		}
 	}
 
+	// Taking all matches for the same read, retain only those
+	// with nmiss equal to at most one greater than the lowest
+	// nmiss.
+	sem := make(chan bool, 1)
+	sem <- true
+	go func() {
+		scanner := bufio.NewScanner(da)
+		var lines []string
+		var fields [][]string
+		var ibuf []int
+		var current string
+		for scanner.Scan() {
+			line := scanner.Text()
+			field := strings.Fields(line)
+
+			// Add to the current block.
+			if current == "" || field[0] == current {
+				lines = append(lines, line)
+				fields = append(fields, field)
+				current = field[0]
+				continue
+			}
+
+			// Process a block
+			ibuf = writebest(lines, fields, wtr, ibuf)
+			lines[0] = line
+			fields[0] = field
+			lines = lines[0:1]
+			fields = fields[0:1]
+			current = field[0]
+		}
+		// Process the final block
+		writebest(lines, fields, wtr, ibuf)
+		<-sem
+	}()
+
 	for _, c := range cmds {
 		err := c.Wait()
 		if err != nil {
 			panic(err)
 		}
 	}
+	sem <- true
+
+	wtr.Close()
+	out.Close()
 
 	logger.Printf("combinewindows done")
 }
@@ -392,7 +463,8 @@ func sortbygeneid() {
 	cmd1 := exec.Command("sztool", "-d", inname)
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
-	cmd2 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k4", "-")
+	// k5 is position of gene id
+	cmd2 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k5", "-")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	var err error
@@ -433,12 +505,12 @@ func joingenenames() {
 	pname1 := pipefromsz(inname)
 	pname2 := pipefromsz(config.GeneIdFileName)
 
-	cmd1 := exec.Command("join", pname1, pname2, "-1", "4", "-2", "1")
+	cmd1 := exec.Command("join", pname1, pname2, "-1", "5", "-2", "1")
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
 
 	// Remove the internal sequence id
-	cmd2 := exec.Command("cut", "-d ", "-f", "2-6", "-")
+	cmd2 := exec.Command("cut", "-d ", "-f", "2-7", "-")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	pi, err := cmd1.StdoutPipe()
