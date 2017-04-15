@@ -44,13 +44,15 @@ install.sh`.
 
 3. Position within the target where the read matches (counting from 0)
 
-4. Target sequence identifier
+4. Number of mismatches
 
-5. Target sequence length
+5. Target sequence identifier
 
-6. Number of copies of read in read pool
+6. Target sequence length
 
-7. Read identifier
+7. Number of copies of read in read pool
+
+8. Read identifier
 
 __Goal and approach__
 
