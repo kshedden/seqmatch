@@ -196,40 +196,39 @@ func windowreads() {
 func sortwindows() {
 
 	logger.Printf("starting sortwindows")
-	var cmds []*exec.Cmd
 
 	for k := 0; k < len(config.Windows); k++ {
 		f := fmt.Sprintf("win_%d.txt.sz", k)
 		fname := path.Join(tmpdir, f)
 		pname1 := pipefromsz(fname)
 
-		cmd2 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k1", pname1)
-		cmd2.Env = os.Environ()
-		cmd2.Stderr = os.Stderr
+		cmd1 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k1", pname1)
+		cmd1.Env = os.Environ()
+		cmd1.Stderr = os.Stderr
 
 		fname = strings.Replace(fname, ".txt.sz", "_sorted.txt.sz", 1)
-		cmd3 := exec.Command("sztool", "-c", "-", fname)
-		cmd3.Env = os.Environ()
-		cmd3.Stderr = os.Stderr
+		cmd2 := exec.Command("sztool", "-c", "-", fname)
+		cmd2.Env = os.Environ()
+		cmd2.Stderr = os.Stderr
 		var err error
-		cmd3.Stdin, err = cmd2.StdoutPipe()
+		cmd2.Stdin, err = cmd1.StdoutPipe()
 		if err != nil {
 			panic(err)
 		}
 
-		cmds = append(cmds, cmd2, cmd3)
-	}
+		cmds := []*exec.Cmd{cmd1, cmd2}
 
-	for _, cmd := range cmds {
-		err := cmd.Start()
-		if err != nil {
-			panic(err)
+		for _, cmd := range cmds {
+			err := cmd.Start()
+			if err != nil {
+				panic(err)
+			}
 		}
-	}
-	for _, cmd := range cmds {
-		err := cmd.Wait()
-		if err != nil {
-			panic(err)
+		for _, cmd := range cmds {
+			err := cmd.Wait()
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 
@@ -251,41 +250,40 @@ func bloom() {
 func sortbloom() {
 
 	logger.Printf("starting sortbloom")
-	var cmds []*exec.Cmd
 
 	for k := range config.Windows {
 		f := fmt.Sprintf("bmatch_%d.txt.sz", k)
 		fname := path.Join(tmpdir, f)
 		pname1 := pipefromsz(fname)
 
-		cmd2 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k1", pname1)
-		cmd2.Env = os.Environ()
-		cmd2.Stderr = os.Stderr
+		cmd1 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k1", pname1)
+		cmd1.Env = os.Environ()
+		cmd1.Stderr = os.Stderr
 
 		f = fmt.Sprintf("smatch_%d.txt.sz", k)
 		fname = path.Join(tmpdir, f)
-		cmd3 := exec.Command("sztool", "-c", "-", fname)
-		cmd3.Env = os.Environ()
-		cmd3.Stderr = os.Stderr
+		cmd2 := exec.Command("sztool", "-c", "-", fname)
+		cmd2.Env = os.Environ()
+		cmd2.Stderr = os.Stderr
 		var err error
-		cmd3.Stdin, err = cmd2.StdoutPipe()
+		cmd2.Stdin, err = cmd1.StdoutPipe()
 		if err != nil {
 			panic(err)
 		}
 
-		cmds = append(cmds, cmd2, cmd3)
-	}
+		cmds := []*exec.Cmd{cmd1, cmd2}
 
-	for _, cmd := range cmds {
-		err := cmd.Start()
-		if err != nil {
-			panic(err)
+		for _, cmd := range cmds {
+			err := cmd.Start()
+			if err != nil {
+				panic(err)
+			}
 		}
-	}
-	for _, cmd := range cmds {
-		err := cmd.Wait()
-		if err != nil {
-			panic(err)
+		for _, cmd := range cmds {
+			err := cmd.Wait()
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 
@@ -619,7 +617,7 @@ func setupLog() {
 	if err != nil {
 		panic(err)
 	}
-	logger = log.New(fid, "", log.Lshortfile)
+	logger = log.New(fid, "", log.Ltime)
 }
 
 func copyconfig(config *utils.Config, tmpdir string) {

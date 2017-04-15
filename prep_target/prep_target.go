@@ -119,7 +119,7 @@ func setupLog() {
 	if err != nil {
 		panic(err)
 	}
-	logger = log.New(fid, "", log.Lshortfile)
+	logger = log.New(fid, "", log.Ltime)
 }
 
 func main() {

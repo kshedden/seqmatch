@@ -36,7 +36,7 @@ func setupLog() {
 	if err != nil {
 		panic(err)
 	}
-	logger = log.New(fid, "", log.Lshortfile)
+	logger = log.New(fid, "", log.Ltime)
 }
 
 func main() {
@@ -86,6 +86,7 @@ func main() {
 
 	wk := make([]int, 25)
 
+	nread := make([]int, len(config.Windows))
 	for jj := 0; scanner.Scan(); jj++ {
 
 		if jj%1000000 == 0 {
@@ -105,6 +106,7 @@ func main() {
 			if len(seq) < q2 {
 				continue
 			}
+			nread[k]++
 
 			key := seq[q1:q2]
 			if utils.CountDinuc(key, wk) < config.MinDinuc {
@@ -131,6 +133,16 @@ func main() {
 				logger.Print(err)
 				panic(err)
 			}
+		}
+	}
+
+	for k, n := range nread {
+		logger.Printf("Window %d produced %d valid reads", k, n)
+
+		if n == 0 {
+			msg := fmt.Sprintf("Window %d produced no valid reads, exiting", k)
+			os.Stderr.WriteString(msg)
+			os.Exit(1)
 		}
 	}
 }

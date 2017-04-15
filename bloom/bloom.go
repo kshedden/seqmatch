@@ -383,7 +383,7 @@ func setupLogger() {
 	if err != nil {
 		panic(err)
 	}
-	logger = log.New(logfid, "", log.Lshortfile)
+	logger = log.New(logfid, "", log.Ltime)
 }
 
 func estimateFullness() {

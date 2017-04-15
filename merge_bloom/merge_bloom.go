@@ -217,7 +217,7 @@ type qrect struct {
 func searchpairs(source, match []*rec, limit chan bool) {
 
 	defer func() { <-limit }()
-	if len(match)*len(source) > 10000 {
+	if len(match)*len(source) > 100000 {
 		logger.Printf("searching %d %d ...", len(match), len(source))
 	}
 
@@ -332,7 +332,7 @@ func setupLog(win int) {
 	if err != nil {
 		panic(err)
 	}
-	logger = log.New(fid, "", log.Lshortfile)
+	logger = log.New(fid, "", log.Ltime)
 }
 
 // rcpy deeply copies its argument.
