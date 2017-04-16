@@ -38,18 +38,6 @@ var (
 	logger      *log.Logger
 )
 
-func compresssource() {
-	logger.Printf("starting compresssource")
-	cmd := exec.Command("prep_reads", tmpjsonfile, tmpdir)
-	cmd.Env = os.Environ()
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	if err != nil {
-		panic(err)
-	}
-	logger.Printf("compresssource done")
-}
-
 func pipename() string {
 	f := fmt.Sprintf("%09d", rand.Int63()%1e9)
 	return path.Join(pipedir, f)
@@ -86,21 +74,30 @@ func sortsource() {
 
 	logger.Printf("starting sortsource")
 
-	fname := path.Join(tmpdir, "reads.txt.sz")
-	pname1 := pipefromsz(fname)
-	logger.Printf("Reading from %s", fname)
+	cmd0 := exec.Command("prep_reads", tmpjsonfile, tmpdir)
+	cmd0.Env = os.Environ()
+	cmd0.Stderr = os.Stderr
 
-	cmd1 := exec.Command("sort", "-S", "2G", "--parallel=8", pname1)
+	cmd1 := exec.Command("sort", "-S", "2G", "--parallel=8")
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
+	var err error
+	cmd1.Stdin, err = cmd0.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
 	pip, err := cmd1.StdoutPipe()
 	if err != nil {
 		panic(err)
 	}
 
-	err = cmd1.Start()
-	if err != nil {
-		panic(err)
+	cmds := []*exec.Cmd{cmd0, cmd1}
+
+	for _, cmd := range cmds {
+		err = cmd.Start()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	scanner := bufio.NewScanner(pip)
@@ -128,10 +125,15 @@ func sortsource() {
 	}
 	fields := strings.Fields(scanner.Text())
 	seq := fields[0]
-	name := fields[1]
+	name := []string{fields[1]}
 	n := 1
 
-	dowrite := func(seq, name string, n int) {
+	dowrite := func(seq string, name []string, n int) {
+		xn := strings.Join(name, ";")
+		if len(xn) > 1000 {
+			xn = xn[0:995]
+			xn += "..."
+		}
 		_, err = wtr.Write([]byte(seq))
 		if err != nil {
 			panic(err)
@@ -140,7 +142,7 @@ func sortsource() {
 		if err != nil {
 			panic(err)
 		}
-		s := fmt.Sprintf("%d\t%s\n", n, name)
+		s := fmt.Sprintf("%d\t%s\n", n, xn)
 		_, err = wtr.Write([]byte(s))
 		if err != nil {
 			panic(err)
@@ -148,7 +150,6 @@ func sortsource() {
 	}
 
 	for scanner.Scan() {
-
 		line := scanner.Text()
 		fields1 := strings.Fields(line)
 		seq1 := fields1[0]
@@ -156,13 +157,14 @@ func sortsource() {
 
 		if strings.Compare(seq, seq1) == 0 {
 			n++
-			name = fmt.Sprintf("%s;%s", name, name1)
+			name = append(name, name1)
 			continue
 		}
 
 		dowrite(seq, name, n)
 		seq = seq1
-		name = name1
+		name = name[0:1]
+		name[0] = name1
 		n = 1
 	}
 
@@ -172,8 +174,10 @@ func sortsource() {
 		panic(err)
 	}
 
-	if err := cmd1.Wait(); err != nil {
-		log.Fatal(err)
+	for _, cmd := range cmds {
+		if err := cmd.Wait(); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	logger.Printf("sortsource done")
@@ -828,46 +832,42 @@ func makeTemp() {
 
 func run() {
 	if startpoint <= 0 {
-		compresssource()
-	}
-
-	if startpoint <= 1 {
 		sortsource()
 	}
 
-	if startpoint <= 2 {
+	if startpoint <= 1 {
 		windowreads()
 	}
 
-	if startpoint <= 3 {
+	if startpoint <= 2 {
 		sortwindows()
 	}
 
-	if startpoint <= 4 {
+	if startpoint <= 3 {
 		bloom()
 	}
 
-	if startpoint <= 5 {
+	if startpoint <= 4 {
 		sortbloom()
 	}
 
-	if startpoint <= 6 {
+	if startpoint <= 5 {
 		mergebloom()
 	}
 
-	if startpoint <= 7 {
+	if startpoint <= 6 {
 		combinewindows()
 	}
 
-	if startpoint <= 8 {
+	if startpoint <= 7 {
 		sortbygeneid()
 	}
 
-	if startpoint <= 9 {
+	if startpoint <= 8 {
 		joingenenames()
 	}
 
-	if startpoint <= 10 {
+	if startpoint <= 9 {
 		joinreadnames()
 	}
 }

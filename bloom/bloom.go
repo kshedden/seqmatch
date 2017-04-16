@@ -90,6 +90,7 @@ func buildBloom() {
 	defer fid.Close()
 	snr := snappy.NewReader(fid)
 	scanner := bufio.NewScanner(snr)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
 	// Workspace for sequence diversity checker
 	wk := make([]int, 25)

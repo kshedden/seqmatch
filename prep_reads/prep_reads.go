@@ -1,14 +1,12 @@
 // Convert a source file of sequencing reads from fastq format to a
-// simple compressed format with one sequence per row.
+// simple format with one sequence per row.
 
 package main
 
 import (
-	"log"
+	"bytes"
 	"os"
-	"path"
 
-	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
 )
 
@@ -16,30 +14,18 @@ var (
 	config *utils.Config
 
 	tmpdir string
-
-	logger *log.Logger
 )
 
 func source() {
 
-	// File for read sequences
-	outfile := path.Join(tmpdir, "reads.txt.sz")
-	out, err := os.Create(outfile)
-	if err != nil {
-		panic(err)
-	}
-	defer out.Close()
-	outw := snappy.NewBufferedWriter(out)
-	defer outw.Close()
-
 	ris := utils.NewReadInSeq(config.ReadFileName, "")
+
+	var bbuf bytes.Buffer
 
 	var lnum int
 	for lnum = 0; ris.Next(); lnum++ {
 
-		if lnum%1000000 == 0 {
-			logger.Printf("sources: %d\n", lnum)
-		}
+		bbuf.Reset()
 
 		if len(ris.Seq) < config.MinReadLength {
 			continue
@@ -65,38 +51,22 @@ func source() {
 			xseq = xseq[0:config.MaxReadLength]
 		}
 
-		_, err := outw.Write(xseq)
-		if err != nil {
-			panic(err)
-		}
+		bbuf.Write(xseq)
+		bbuf.Write([]byte("\t"))
 
-		_, err = outw.Write([]byte("\t"))
-		if err != nil {
-			panic(err)
+		rn := ris.Name
+		if len(rn) > 1000 {
+			rn = rn[0:995] + "..."
 		}
+		bbuf.Write([]byte(rn))
 
-		_, err = outw.Write([]byte(ris.Name))
-		if err != nil {
-			panic(err)
-		}
+		bbuf.Write([]byte("\n"))
 
-		_, err = outw.Write([]byte("\n"))
+		_, err := os.Stdout.Write(bbuf.Bytes())
 		if err != nil {
 			panic(err)
 		}
 	}
-
-	logger.Printf("Processed %d reads", lnum)
-	logger.Printf("Done with sources")
-}
-
-func setupLog() {
-	logname := path.Join(tmpdir, "compress_source.log")
-	fid, err := os.Create(logname)
-	if err != nil {
-		panic(err)
-	}
-	logger = log.New(fid, "", log.Ltime)
 }
 
 func main() {
@@ -112,7 +82,5 @@ func main() {
 		tmpdir = config.TempDir
 	}
 
-	setupLog()
 	source()
-	logger.Printf("Done")
 }
