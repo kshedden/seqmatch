@@ -133,11 +133,15 @@ in a gene.
 * MatchMode: Either `first` or `best`.  If `first`, for each window
 sequence, the first `MaxMatches` instances of a read match meeting the
 `PMatch` criterion are retained.  If `best`, the best `MaxMatches`
-read matches are returned, where "best" is based on having the minimum
+read matches are retained, where "best" is based on having the minimum
 number of mismatching positions.
 
 * MaxMergeProcs: The maximum number of merge operations that are
   performed concurrently.
+
+* MMTol: Target sequences matching a read are retained if their number
+of mismatches is no more than the lowest number of mismatches (for the
+read) plus MMTol.
 
 A rule of thumb would be to set `BloomSize` equal to twice the number
 of reads times `NumHash`.
