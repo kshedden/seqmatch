@@ -186,15 +186,17 @@ Count the distinct genes that successfully match a read:
 awk '{print $5}' PRT_NOV_15_02_100_matches.txt | sort -u | wc -l
 ```
 
-Find all the reads that do not match anything:
+Find all the reads that do not match anything (replace matchfile with
+the output file of the matching process, and replace tmpdir with the
+temporary directory used to store intermediate results):
 
 ```
 export LC_ALL=C
 rm -f tmp[1-2]
 mkfifo tmp1
-sztool -d tmp/PRT_NOV_15_02_sorted.txt.sz | awk '{print $2}' | sort -u > tmp1 &
+sztool -d tmpdir/read_sorted.txt.sz | awk '{print $3}' | sort -u > tmp1 &
 mkfifo tmp2
-awk '{print $1}' PRT_NOV_15_02_100_matches.txt | sort -u > tmp2 &
+awk '{print $1}' matchfile | sort -u > tmp2 &
 comm -23 tmp1 tmp2 > nomatches.txt
 rm -f tmp1 tmp2
 ```
