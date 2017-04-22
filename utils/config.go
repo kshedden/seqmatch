@@ -53,6 +53,11 @@ type Config struct {
 	// simultaneously, defaults to 3.
 	MaxMergeProcs int
 
+	// Number of additional mismatches beyond the best possible
+	// number of mismatches that are allowed when retaining the
+	// target sequence matches to each read.
+	MMTol int
+
 	// Either "first" (default) or "best".  If first, returns the
 	// first MaxMatches matches for each window.  If best, returns
 	// the MaxMatches matches for each window with the fewest

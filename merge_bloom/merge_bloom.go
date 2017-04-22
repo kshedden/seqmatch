@@ -292,6 +292,7 @@ func searchpairs(source, match []*rec, limit chan bool) {
 						qvals = append(qvals, qq)
 					} else {
 						j := sort.Search(m, f)
+						qvals = append(qvals, nil)
 						copy(qvals[j+1:m+1], qvals[j:m])
 						qvals[j] = qq
 					}
@@ -305,7 +306,6 @@ func searchpairs(source, match []*rec, limit chan bool) {
 					}
 				}
 			}
-
 		}
 	}
 

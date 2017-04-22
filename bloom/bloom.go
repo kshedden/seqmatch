@@ -76,6 +76,8 @@ func genTables() {
 // buildBloom constructs bloom filters for each window
 func buildBloom() {
 
+	logger.Printf("Building Bloom filters from reads...")
+
 	hashes := make([]rollinghash.Hash32, config.NumHash)
 	for j := range hashes {
 		hashes[j] = buzhash32.NewFromUint32Array(tables[j])
@@ -136,7 +138,7 @@ func buildBloom() {
 		panic(err)
 	}
 
-	logger.Printf("Done constructing filters")
+	logger.Printf("Done constructing Bloom filters")
 }
 
 type rec struct {

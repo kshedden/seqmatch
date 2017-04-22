@@ -127,6 +127,7 @@ func sortsource() {
 	seq := fields[0]
 	name := []string{fields[1]}
 	n := 1
+	nseq := 0
 
 	dowrite := func(seq string, name []string, n int) {
 		xn := strings.Join(name, ";")
@@ -134,6 +135,7 @@ func sortsource() {
 			xn = xn[0:995]
 			xn += "..."
 		}
+		nseq++
 		_, err = wtr.Write([]byte(seq))
 		if err != nil {
 			panic(err)
@@ -180,6 +182,7 @@ func sortsource() {
 		}
 	}
 
+	logger.Printf(fmt.Sprintf("Wrote %d read sequences", nseq))
 	logger.Printf("sortsource done")
 }
 
@@ -329,8 +332,7 @@ func mergebloom() {
 	logger.Printf("mergebloom done")
 }
 
-func writebest(lines []string, bfr [][]string, wtr io.Writer, ibuf []int) []int {
-
+func writebest(lines []string, bfr [][]string, wtr io.Writer, ibuf []int, mmtol int) []int {
 	ibuf = ibuf[0:0]
 	best := -1
 	for _, x := range bfr {
@@ -345,7 +347,7 @@ func writebest(lines []string, bfr [][]string, wtr io.Writer, ibuf []int) []int 
 	}
 
 	for i, x := range lines {
-		if ibuf[i] <= best+1 {
+		if ibuf[i] <= best+mmtol {
 			_, err := wtr.Write([]byte(x))
 			if err != nil {
 				panic(err)
@@ -363,6 +365,8 @@ func writebest(lines []string, bfr [][]string, wtr io.Writer, ibuf []int) []int 
 func combinewindows() {
 
 	logger.Printf("starting combinewindows")
+
+	mmtol := config.MMTol
 
 	// Pipe everything into one sort/unique
 	c0 := exec.Command("sort", "-S", "2G", "--parallel=8", "-u", "-")
@@ -429,7 +433,7 @@ func combinewindows() {
 			}
 
 			// Process a block
-			ibuf = writebest(lines, fields, wtr, ibuf)
+			ibuf = writebest(lines, fields, wtr, ibuf, mmtol)
 			lines[0] = line
 			fields[0] = field
 			lines = lines[0:1]
@@ -437,7 +441,7 @@ func combinewindows() {
 			current = field[0]
 		}
 		// Process the final block
-		writebest(lines, fields, wtr, ibuf)
+		writebest(lines, fields, wtr, ibuf, mmtol)
 		<-sem
 	}()
 
@@ -512,7 +516,7 @@ func joingenenames() {
 	cmd1.Stderr = os.Stderr
 
 	// Remove the internal sequence id
-	cmd2 := exec.Command("cut", "-d ", "-f", "2-7", "-")
+	cmd2 := exec.Command("cut", "-d ", "-f", "1", "--complement", "-")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	pi, err := cmd1.StdoutPipe()
@@ -774,7 +778,8 @@ func checkArgs() {
 		config.MaxMergeProcs = 3
 	}
 	if !strings.HasSuffix(config.ReadFileName, ".fastq") {
-		msg := fmt.Sprintf("Warning: %s may not be a fastq file", config.ReadFileName)
+		msg := fmt.Sprintf("Warning: %s may not be a fastq file, continuing anyway\n",
+			config.ReadFileName)
 		os.Stderr.WriteString(msg)
 	}
 	if config.MatchMode == "" {
