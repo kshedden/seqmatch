@@ -97,7 +97,8 @@ func buildBloom() {
 	// Workspace for sequence diversity checker
 	wk := make([]int, 25)
 
-	for j := 0; scanner.Scan(); j++ {
+	var j int
+	for ; scanner.Scan(); j++ {
 
 		if j%1000000 == 0 {
 			logger.Printf("%d\n", j)
@@ -134,6 +135,8 @@ func buildBloom() {
 	}
 
 	if err := scanner.Err(); err != nil {
+		msg := fmt.Sprintf("Problem reading reads_sorted.txt.sz on line %d\n", j)
+		os.Stderr.WriteString(msg)
 		logger.Print(err)
 		panic(err)
 	}
@@ -351,7 +354,8 @@ func search() {
 	wg.Add(1)
 	go harvest(&wg)
 
-	for i := 0; scanner.Scan(); i++ {
+	var i int
+	for ; scanner.Scan(); i++ {
 
 		if i%1000000 == 0 {
 			logger.Printf("%d\n", i)
@@ -367,6 +371,8 @@ func search() {
 	}
 
 	if err := scanner.Err(); err != nil {
+		msg := fmt.Sprintf("Problem reading %s on line %d\n", config.GeneFileName, i)
+		os.Stderr.WriteString(msg)
 		logger.Print(err)
 		panic(err)
 	}

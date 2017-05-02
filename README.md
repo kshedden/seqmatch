@@ -141,7 +141,9 @@ number of mismatching positions.
 
 * MMTol: Target sequences matching a read are retained if their number
 of mismatches is no more than the lowest number of mismatches (for the
-read) plus MMTol.
+read) plus MMTol, e.g. if MMTol=0, then each read is only matched to
+target sequences that have the lowest observed number of mismatches
+for that read.
 
 A rule of thumb would be to set `BloomSize` equal to twice the number
 of reads times `NumHash`.

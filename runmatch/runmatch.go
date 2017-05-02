@@ -311,6 +311,7 @@ func mergebloom() {
 
 		var cmds []*exec.Cmd
 		for k := fp; k < fp+nproc; k++ {
+			logger.Printf("Starting a round of merge processes")
 			cmd := exec.Command("merge_bloom", tmpjsonfile, fmt.Sprintf("%d", k), tmpdir)
 			cmd.Env = os.Environ()
 			cmd.Stderr = os.Stderr
