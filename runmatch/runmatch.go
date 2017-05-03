@@ -661,6 +661,7 @@ func handleArgs() {
 	MaxReadLength := flag.Int("MaxReadLength", 0, "Reads longer than this length are truncated")
 	MaxMatches := flag.Int("MaxMatches", 0, "Return no more than this number of matches per window")
 	MaxMergeProcs := flag.Int("MaxMergeProcs", 0, "Run this number of merge processes concurrently")
+	MMTol := flag.Int("MMTol", 0, "Number of mismatches allowed above best fit")
 	StartPoint := flag.Int("StartPoint", 0, "Restart at a given point in the procedure")
 	MatchMode := flag.String("MatchMode", "", "'first' (retain first matches meeting criteria) or 'best' (returns best matches meeting criteria)")
 
@@ -714,6 +715,9 @@ func handleArgs() {
 	}
 	if *MatchMode != "" {
 		config.MatchMode = *MatchMode
+	}
+	if *MMTol != 0 {
+		config.MMTol = *MMTol
 	}
 
 	startpoint = *StartPoint
