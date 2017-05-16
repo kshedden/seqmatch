@@ -170,11 +170,11 @@ func sortsource() {
 		n = 1
 	}
 
-	dowrite(seq, name, n)
-
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
+
+	dowrite(seq, name, n)
 
 	for _, cmd := range cmds {
 		if err := cmd.Wait(); err != nil {
@@ -435,14 +435,22 @@ func combinewindows() {
 
 			// Process a block
 			ibuf = writebest(lines, fields, wtr, ibuf, mmtol)
-			lines[0] = line
-			fields[0] = field
-			lines = lines[0:1]
-			fields = fields[0:1]
+			lines = lines[0:0]
+			lines = append(lines, line)
+			fields = fields[0:0]
+			fields = append(fields, field)
 			current = field[0]
 		}
-		// Process the final block
-		writebest(lines, fields, wtr, ibuf, mmtol)
+
+		if err := scanner.Err(); err == nil {
+			// Process the final block if possible
+			writebest(lines, fields, wtr, ibuf, mmtol)
+		} else {
+			// Occasionally it fails with an error stating
+			// that the pipe was closed.
+			logger.Printf("%v", err)
+		}
+
 		<-sem
 	}()
 
