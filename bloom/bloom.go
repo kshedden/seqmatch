@@ -183,7 +183,7 @@ func checkwin(ix []int, iw []uint64, hashes []rollinghash.Hash32) []int {
 	return ix
 }
 
-// process one sequence, runs concurrently with main loop.
+// process one target sequence, runs concurrently with main loop.
 func processseq(seq []byte, genenum int) {
 
 	hashes := make([]rollinghash.Hash32, config.NumHash)

@@ -16,9 +16,10 @@ install.sh`.
   scripts to contain your email address and Flux account.
 
 * Edit the file name in `prep_target.pbs` to point to the gene data
-  file.  The gene data file must be a text file, with each line having
-  format "identifier tab sequence newline".  Then type `qsub
-  prep_target.pbs` and wait for this script to complete before
+  file.  The gene data file must be in one of the following two
+  formats: (i) a FASTA file, (ii) a text file, with each line having
+  two tab-delimited fields: an ideentifier and a sequence.  Then type
+  `qsub prep_target.pbs` and wait for this script to complete before
   proceeding.  Note that this script only needs to be run when the
   gene database changes, it does not utilize the sequencing read files
   at all.  If the gene data file has name `genes.txt`, the output
@@ -36,7 +37,7 @@ install.sh`.
   20 hashes, and PMatch around 0.9-1).  Alternatively, the parameters
   can be passed using command-line flags, as discussed below.
 
-* The output columns are as follows:
+* The tab-delimited output columns are:
 
 1. Read sequence
 

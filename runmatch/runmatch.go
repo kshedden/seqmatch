@@ -520,12 +520,12 @@ func joingenenames() {
 	pname1 := pipefromsz(inname)
 	pname2 := pipefromsz(config.GeneIdFileName)
 
-	cmd1 := exec.Command("join", pname1, pname2, "-1", "5", "-2", "1")
+	cmd1 := exec.Command("join", "-1", "5", "-2", "1", "-t	", pname1, pname2)
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
 
 	// Remove the internal sequence id
-	cmd2 := exec.Command("cut", "-d ", "-f", "1", "--complement", "-")
+	cmd2 := exec.Command("cut", "-d	", "-f", "1", "--complement", "-")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	pi, err := cmd1.StdoutPipe()
@@ -600,7 +600,7 @@ func joinreadnames() {
 	wtr := bufio.NewWriter(fid)
 	defer wtr.Flush()
 
-	cmd2 := exec.Command("join", name, pnamer, "-1", "1", "-2", "1")
+	cmd2 := exec.Command("join", "-1", "1", "-2", "1", "-t	", name, pnamer)
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	cmd2.Stdout = wtr
