@@ -197,9 +197,9 @@ temporary directory used to store intermediate results):
 export LC_ALL=C
 rm -f tmp[1-2]
 mkfifo tmp1
-sztool -d tmpdir/read_sorted.txt.sz | awk '{print $3}' | sort -u > tmp1 &
+sztool -d tmpdir/reads_sorted.txt.sz | awk '{print $3}' | sort -u > tmp1 &
 mkfifo tmp2
-awk '{print $1}' matchfile | sort -u > tmp2 &
+awk '{print $8}' matchfile | sort -u > tmp2 &
 comm -23 tmp1 tmp2 > nomatches.txt
 rm -f tmp1 tmp2
 ```
