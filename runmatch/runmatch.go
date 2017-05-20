@@ -8,6 +8,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
+	"github.com/willf/bloom"
 	"golang.org/x/sys/unix"
 )
 
@@ -246,7 +248,7 @@ func sortwindows() {
 	logger.Printf("sortwindows done")
 }
 
-func bloom() {
+func makebloom() {
 	logger.Printf("starting bloom")
 	cmd := exec.Command("bloom", tmpjsonfile, tmpdir)
 	cmd.Env = os.Environ()
@@ -859,6 +861,86 @@ func makeTemp() {
 	}
 }
 
+func writenonmatch() {
+
+	logger.Print("Starting writenonmatch")
+
+	// Read match file
+	_, inname := path.Split(config.ReadFileName)
+	s := fmt.Sprintf("_%.0f_%d_%d_matches.txt", 100*config.PMatch, len(config.Windows), config.WindowWidth)
+	inname = strings.Replace(inname, ".fastq", s, 1)
+	inf, err := os.Open(inname)
+	if err != nil {
+		panic(err)
+	}
+	defer inf.Close()
+
+	// Build a bloom filter based on the matched sequences
+	billion := uint(1000 * 1000 * 1000)
+	bf := bloom.New(4*billion, 5)
+	scanner := bufio.NewScanner(inf)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	for scanner.Scan() {
+		f := bytes.Fields(scanner.Bytes())
+		bf.Add(f[0])
+	}
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
+
+	// Nonmatch output file
+	_, outname := path.Split(config.ReadFileName)
+	s = fmt.Sprintf("_%.0f_%d_%d_nonmatches.fastq", 100*config.PMatch, len(config.Windows), config.WindowWidth)
+	outname = strings.Replace(outname, ".fastq", s, 1)
+	out, err := os.Create(outname)
+	if err != nil {
+		panic(err)
+	}
+	defer out.Close()
+	wtr := bufio.NewWriter(out)
+	defer wtr.Flush()
+
+	rfname := path.Join(tmpdir, "reads_sorted.txt.sz")
+	inf, err = os.Open(rfname)
+	if err != nil {
+		panic(err)
+	}
+	defer inf.Close()
+	rdr := snappy.NewReader(inf)
+	scanner = bufio.NewScanner(rdr)
+	for scanner.Scan() {
+		f := bytes.Fields(scanner.Bytes())
+		if !bf.Test(f[0]) {
+			_, err := wtr.Write(f[2])
+			if err != nil {
+				panic(err)
+			}
+			_, err = wtr.Write([]byte("\n"))
+			if err != nil {
+				panic(err)
+			}
+			_, err = wtr.Write(f[0])
+			if err != nil {
+				panic(err)
+			}
+			_, err = wtr.Write([]byte("\n+\n"))
+			if err != nil {
+				panic(err)
+			}
+			_, err = wtr.Write(bytes.Repeat([]byte{'!'}, len(f[0])))
+			if err != nil {
+				panic(err)
+			}
+			_, err = wtr.Write([]byte("\n"))
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	logger.Printf("writenonmatch done")
+}
+
 func run() {
 	if startpoint <= 0 {
 		sortsource()
@@ -873,7 +955,7 @@ func run() {
 	}
 
 	if startpoint <= 3 {
-		bloom()
+		makebloom()
 	}
 
 	if startpoint <= 4 {
@@ -898,6 +980,10 @@ func run() {
 
 	if startpoint <= 9 {
 		joinreadnames()
+	}
+
+	if startpoint <= 10 {
+		writenonmatch()
 	}
 }
 
