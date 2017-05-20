@@ -37,7 +37,9 @@ install.sh`.
   20 hashes, and PMatch around 0.9-1).  Alternatively, the parameters
   can be passed using command-line flags, as discussed below.
 
-* The tab-delimited output columns are:
+* The output consists of two files: a fastq file containing
+  non-matching reads, and a tab-delimited match file, whose output
+  columns are:
 
 1. Read sequence
 
