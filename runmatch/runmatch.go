@@ -174,6 +174,7 @@ func sortsource() {
 		panic(err)
 	}
 
+	// Read to EOF before calling wait.
 	dowrite(seq, name, n)
 
 	for _, cmd := range cmds {
@@ -223,7 +224,7 @@ func sortwindows() {
 			panic(err)
 		}
 
-		cmds := []*exec.Cmd{cmd1, cmd2}
+		cmds := []*exec.Cmd{cmd2, cmd1}
 
 		for _, cmd := range cmds {
 			err := cmd.Start()
@@ -231,6 +232,9 @@ func sortwindows() {
 				panic(err)
 			}
 		}
+
+		// Order is important here, need to wait on cmd2
+		// before waiting on cmd1.
 		for _, cmd := range cmds {
 			err := cmd.Wait()
 			if err != nil {
@@ -278,7 +282,8 @@ func sortbloom() {
 			panic(err)
 		}
 
-		cmds := []*exec.Cmd{cmd1, cmd2}
+		// Order matters here
+		cmds := []*exec.Cmd{cmd2, cmd1}
 
 		for _, cmd := range cmds {
 			err := cmd.Start()
@@ -286,6 +291,8 @@ func sortbloom() {
 				panic(err)
 			}
 		}
+
+		// Order is important, must wait on cmd2 first
 		for _, cmd := range cmds {
 			err := cmd.Wait()
 			if err != nil {
@@ -415,7 +422,8 @@ func combinewindows() {
 	// nmiss.
 	sem := make(chan bool, 1)
 	sem <- true
-	go func() {
+	// DEBUG used to be go func()
+	func() {
 		scanner := bufio.NewScanner(da)
 		var lines []string
 		var fields [][]string
@@ -446,14 +454,16 @@ func combinewindows() {
 			// Process the final block if possible
 			writebest(lines, fields, wtr, ibuf, mmtol)
 		} else {
-			// Occasionally it fails with an error stating
-			// that the pipe was closed.
+			// Should never get here, but just in case log
+			// the error but don't try to process the
+			// remaining lines which may be corrupted.
 			logger.Printf("%v", err)
 		}
 
 		<-sem
 	}()
 
+	// OK to call Wait, done reading.
 	for _, c := range cmds {
 		err := c.Wait()
 		if err != nil {
@@ -495,13 +505,16 @@ func sortbygeneid() {
 		panic(err)
 	}
 
-	cmds := []*exec.Cmd{cmd1, cmd2, cmd3}
+	// Order matters
+	cmds := []*exec.Cmd{cmd3, cmd2, cmd1}
 	for _, c := range cmds {
 		err := c.Start()
 		if err != nil {
 			panic(err)
 		}
 	}
+
+	// Call Wait from end to beginning of chained commands
 	for _, c := range cmds {
 		err := c.Wait()
 		if err != nil {
@@ -520,15 +533,19 @@ func joingenenames() {
 	pname1 := pipefromsz(inname)
 	pname2 := pipefromsz(config.GeneIdFileName)
 
+	// Character after -t is a tab
 	cmd1 := exec.Command("join", "-1", "5", "-2", "1", "-t	", pname1, pname2)
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
 
-	// Remove the internal sequence id
+	// Remove the internal sequence id (character after -d is a tab)
 	cmd2 := exec.Command("cut", "-d	", "-f", "1", "--complement", "-")
 	cmd2.Env = os.Environ()
 	cmd2.Stderr = os.Stderr
 	pi, err := cmd1.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
 	cmd2.Stdin = pi
 
 	// Output file
@@ -542,7 +559,8 @@ func joingenenames() {
 	defer wtr.Close()
 	cmd2.Stdout = wtr
 
-	cmds := []*exec.Cmd{cmd1, cmd2}
+	// Order matters
+	cmds := []*exec.Cmd{cmd2, cmd1}
 
 	for _, c := range cmds {
 		err := c.Start()
@@ -551,6 +569,7 @@ func joingenenames() {
 		}
 	}
 
+	// Wait from end to beginning
 	for _, c := range cmds {
 		err := c.Wait()
 		if err != nil {
@@ -571,19 +590,11 @@ func joinreadnames() {
 	rfname := path.Join(tmpdir, "reads_sorted.txt.sz")
 	pnamer := pipefromsz(rfname)
 
-	// Pipe to accept the sorted matches
-	name := pipename()
-	err := unix.Mkfifo(name, 0755)
-	if err != nil {
-		panic(err)
-	}
-
 	// Sort the matches
 	cmd1 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k1", pnamem)
 	cmd1.Env = os.Environ()
 	cmd1.Stderr = os.Stderr
-	fif, err := os.OpenFile(name, os.O_RDWR, 0600)
-	cmd1.Stdout = fif
+	pi, err := cmd1.StdoutPipe()
 	if err != nil {
 		panic(err)
 	}
@@ -600,12 +611,14 @@ func joinreadnames() {
 	wtr := bufio.NewWriter(fid)
 	defer wtr.Flush()
 
-	cmd2 := exec.Command("join", "-1", "1", "-2", "1", "-t	", name, pnamer)
+	// Character after -t is a tab
+	cmd2 := exec.Command("join", "-1", "1", "-2", "1", "-t	", "-", pnamer)
 	cmd2.Env = os.Environ()
+	cmd2.Stdin = pi
 	cmd2.Stderr = os.Stderr
 	cmd2.Stdout = wtr
 
-	cmds := []*exec.Cmd{cmd1, cmd2}
+	cmds := []*exec.Cmd{cmd2, cmd1}
 
 	for _, c := range cmds {
 		err := c.Start()
@@ -614,13 +627,11 @@ func joinreadnames() {
 		}
 	}
 
-	err = cmd1.Wait()
+	err = cmd2.Wait()
 	if err != nil {
 		panic(err)
 	}
-	fif.Close()
-
-	err = cmd2.Wait()
+	err = cmd1.Wait()
 	if err != nil {
 		panic(err)
 	}

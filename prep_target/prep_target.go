@@ -214,7 +214,7 @@ func targets(genefile string) {
 }
 
 func setupLog() {
-	fid, err := os.Create("compress_target.log")
+	fid, err := os.Create("prep_target.log")
 	if err != nil {
 		panic(err)
 	}
