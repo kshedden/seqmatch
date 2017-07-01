@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
+	"github.com/scipipe/scipipe"
 	"github.com/willf/bloom"
 	"golang.org/x/sys/unix"
 )
@@ -76,6 +77,7 @@ func sortsource() {
 
 	logger.Printf("starting sortsource")
 
+	logger.Printf("Running prep_reads %s %s", tmpjsonfile, tmpdir)
 	cmd0 := exec.Command("prep_reads", tmpjsonfile, tmpdir)
 	cmd0.Env = os.Environ()
 	cmd0.Stderr = os.Stderr
@@ -120,7 +122,7 @@ func sortsource() {
 	// Get the first line
 	if !scanner.Scan() {
 		logger.Printf("no input")
-		panic("no input")
+		panic("no input (is the read file empty?)")
 	}
 	if err := scanner.Err(); err != nil {
 		panic(err)
@@ -531,53 +533,34 @@ func joingenenames() {
 
 	logger.Printf("starting joingenenames")
 
-	inname := path.Join(tmpdir, "matches_sg.txt.sz")
-	pname1 := pipefromsz(inname)
-	pname2 := pipefromsz(config.GeneIdFileName)
+	// Decompress matches
+	ma := scipipe.NewProc("ma", fmt.Sprintf("sztool -d %s > {os:ma}", path.Join(tmpdir, "matches_sg.txt.sz")))
+	ma.SetPathStatic("ma", path.Join(pipedir, "jgn_ma.txt"))
 
-	// Character after -t is a tab
-	cmd1 := exec.Command("join", "-1", "5", "-2", "1", "-t	", pname1, pname2)
-	cmd1.Env = os.Environ()
-	cmd1.Stderr = os.Stderr
+	// Decompress gene ids
+	gn := scipipe.NewProc("gn", fmt.Sprintf("sztool -d %s > {os:gn}", config.GeneIdFileName))
+	gn.SetPathStatic("gn", path.Join(pipedir, "jgn_gn.txt"))
 
-	// Remove the internal sequence id (character after -d is a tab)
-	cmd2 := exec.Command("cut", "-d	", "-f", "1", "--complement", "-")
-	cmd2.Env = os.Environ()
-	cmd2.Stderr = os.Stderr
-	pi, err := cmd1.StdoutPipe()
-	if err != nil {
-		panic(err)
-	}
-	cmd2.Stdin = pi
+	// Join genes and matches
+	jo := scipipe.NewProc("jo", "join -1 5 -2 1 -t'\t' {i:mx} {i:gx} > {os:jx}")
+	jo.SetPathStatic("jx", path.Join(pipedir, "jgn_joined.txt"))
 
-	// Output file
-	outname := path.Join(tmpdir, "matches_sn.txt.sz")
-	fid, err := os.Create(outname)
-	if err != nil {
-		panic(err)
-	}
-	defer fid.Close()
-	wtr := snappy.NewBufferedWriter(fid)
-	defer wtr.Close()
-	cmd2.Stdout = wtr
+	// Cut out unwanted column
+	ct := scipipe.NewProc("ct", "cut -d'\t' -f 1 --complement {i:jy} > {os:co}")
+	ct.SetPathStatic("co", path.Join(pipedir, "jgn_cut.txt"))
 
-	// Order matters
-	cmds := []*exec.Cmd{cmd2, cmd1}
+	// Compress the result
+	sz := scipipe.NewProc("sz", fmt.Sprintf("sztool -c {i:zi} %s", path.Join(tmpdir, "matches_sn.txt.sz")))
 
-	for _, c := range cmds {
-		err := c.Start()
-		if err != nil {
-			panic(err)
-		}
-	}
+	jo.In("mx").Connect(ma.Out("ma"))
+	jo.In("gx").Connect(gn.Out("gn"))
+	ct.In("jy").Connect(jo.Out("jx"))
+	sz.In("zi").Connect(ct.Out("co"))
 
-	// Wait from end to beginning
-	for _, c := range cmds {
-		err := c.Wait()
-		if err != nil {
-			panic(err)
-		}
-	}
+	wf := scipipe.NewWorkflow("jgn")
+	wf.AddProcs(ma, gn, jo, ct, sz)
+	wf.SetDriver(sz)
+	wf.Run()
 
 	logger.Printf("joingenenames done")
 }
@@ -586,57 +569,48 @@ func joinreadnames() {
 
 	logger.Printf("starting joinreadnames")
 
-	inname := path.Join(tmpdir, "matches_sn.txt.sz")
-	pnamem := pipefromsz(inname)
-
-	rfname := path.Join(tmpdir, "reads_sorted.txt.sz")
-	pnamer := pipefromsz(rfname)
-
-	// Sort the matches
-	cmd1 := exec.Command("sort", "-S", "2G", "--parallel=8", "-k1", pnamem)
-	cmd1.Env = os.Environ()
-	cmd1.Stderr = os.Stderr
-	pi, err := cmd1.StdoutPipe()
-	if err != nil {
-		panic(err)
-	}
-
-	// Output file
-	_, outname := path.Split(config.ReadFileName)
-	s := fmt.Sprintf("_%.0f_%d_%d_matches.txt", 100*config.PMatch, len(config.Windows), config.WindowWidth)
-	outname = strings.Replace(outname, ".fastq", s, 1)
-	fid, err := os.Create(outname)
-	if err != nil {
-		panic(err)
-	}
-	defer fid.Close()
-	wtr := bufio.NewWriter(fid)
-	defer wtr.Flush()
-
-	// Character after -t is a tab
-	cmd2 := exec.Command("join", "-1", "1", "-2", "1", "-t	", "-", pnamer)
-	cmd2.Env = os.Environ()
-	cmd2.Stdin = pi
-	cmd2.Stderr = os.Stderr
-	cmd2.Stdout = wtr
-
-	cmds := []*exec.Cmd{cmd2, cmd1}
-
-	for _, c := range cmds {
-		err := c.Start()
+	// The workflow hangs if the results file already exists, so
+	// remove it.
+	_, err := os.Stat(config.ResultsFileName)
+	if err == nil || !os.IsNotExist(err) {
+		err := os.Remove(config.ResultsFileName)
 		if err != nil {
 			panic(err)
 		}
+	} else {
+		panic(err)
 	}
 
-	err = cmd2.Wait()
-	if err != nil {
-		panic(err)
-	}
-	err = cmd1.Wait()
-	if err != nil {
-		panic(err)
-	}
+	// Decompress matches
+	ma := scipipe.NewProc("ma", fmt.Sprintf("sztool -d %s > {os:ma}",
+		path.Join(tmpdir, "matches_sn.txt.sz")))
+	ma.SetPathStatic("ma", path.Join(pipedir, "jrn_ma.txt"))
+
+	// Decompress sorted reads
+	rd := scipipe.NewProc("rd", fmt.Sprintf("sztool -d %s > {os:rd}",
+		path.Join(tmpdir, "reads_sorted.txt.sz")))
+	rd.SetPathStatic("rd", path.Join(pipedir, "jrn_rd.txt"))
+
+	// Sort the matches
+	sm := scipipe.NewProc("sm", "sort -S 2G --parallel=8 -k1 {i:in} > {os:sort}")
+	sm.SetPathStatic("sort", path.Join(pipedir, "jrn_sort.txt"))
+
+	// Join the sorted matches with the reads
+	jo := scipipe.NewProc("jo", "join -1 1 -2 1 -t'\t' {i:srx} {i:rdx} > {o:out}")
+	jo.SetPathStatic("out", config.ResultsFileName)
+
+	snk := scipipe.NewSink("snk")
+
+	// Connect the network
+	sm.In("in").Connect(ma.Out("ma"))
+	jo.In("srx").Connect(sm.Out("sort"))
+	jo.In("rdx").Connect(rd.Out("rd"))
+	snk.Connect(jo.Out("out"))
+
+	wf := scipipe.NewWorkflow("jrn")
+	wf.AddProcs(ma, rd, sm, jo)
+	wf.SetDriver(snk)
+	wf.Run()
 
 	logger.Printf("joinreadnames done")
 }
@@ -739,6 +713,11 @@ func handleArgs() {
 	}
 	if *MMTol != 0 {
 		config.MMTol = *MMTol
+	}
+
+	if config.ResultsFileName == "" {
+		print("ResultsFileName must be specified")
+		os.Exit(1)
 	}
 
 	startpoint = *StartPoint

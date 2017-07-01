@@ -1,20 +1,44 @@
-// Convert a source file of sequencing reads from fastq format to a
-// simple format with one sequence per row.
+// prep_reads converts a source file of sequencing reads from fastq
+// format to a simple format with one sequence per row, used
+// internally by Muscato
 
 package main
 
 import (
 	"bytes"
+	"log"
 	"os"
+	"path"
 
 	"github.com/kshedden/seqmatch/utils"
+)
+
+const (
+	// The maximum length of a read identifier
+	maxNameLen = 1000
 )
 
 var (
 	config *utils.Config
 
 	tmpdir string
+
+	logger *log.Logger
 )
+
+// subx replaces non A/T/G/C with X
+func subx(seq []byte) {
+	for i, c := range seq {
+		switch c {
+		case 'A':
+		case 'T':
+		case 'C':
+		case 'G':
+		default:
+			seq[i] = 'X'
+		}
+	}
+}
 
 func source() {
 
@@ -22,51 +46,54 @@ func source() {
 
 	var bbuf bytes.Buffer
 
+	nskip := 0
+
 	var lnum int
 	for lnum = 0; ris.Next(); lnum++ {
 
 		bbuf.Reset()
 
 		if len(ris.Seq) < config.MinReadLength {
+			nskip++
 			continue
 		}
 
 		xseq := []byte(ris.Seq)
-		for i, c := range xseq {
-			switch c {
-			case 'A':
-				// pass
-			case 'T':
-				// pass
-			case 'C':
-				// pass
-			case 'G':
-				// pass
-			default:
-				xseq[i] = 'X'
-			}
-		}
+		subx(xseq)
 
 		if len(xseq) > config.MaxReadLength {
 			xseq = xseq[0:config.MaxReadLength]
 		}
 
-		bbuf.Write(xseq)
-		bbuf.Write([]byte("\t"))
+		_, err := bbuf.Write(append(xseq, '\t'))
+		if err != nil {
+			panic(err)
+		}
 
 		rn := ris.Name
-		if len(rn) > 1000 {
-			rn = rn[0:995] + "..."
+		if len(rn) > maxNameLen {
+			rn = rn[0:(maxNameLen-5)] + "..."
 		}
 		bbuf.Write([]byte(rn))
 
 		bbuf.Write([]byte("\n"))
 
-		_, err := os.Stdout.Write(bbuf.Bytes())
+		_, err = os.Stdout.Write(bbuf.Bytes())
 		if err != nil {
 			panic(err)
 		}
 	}
+
+	logger.Printf("Skipped %d reads for being too short", nskip)
+}
+
+func setupLog() {
+	logname := path.Join(tmpdir, "prep_reads.log")
+	fid, err := os.Create(logname)
+	if err != nil {
+		panic(err)
+	}
+	logger = log.New(fid, "", log.Ltime)
 }
 
 func main() {
@@ -82,5 +109,8 @@ func main() {
 		tmpdir = config.TempDir
 	}
 
+	setupLog()
+	logger.Printf("Starting prep_reads")
 	source()
+	logger.Printf("Done")
 }

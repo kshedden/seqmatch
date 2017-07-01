@@ -16,6 +16,9 @@ type Config struct {
 	// Gene ids
 	GeneIdFileName string
 
+	// The path where the results are written
+	ResultsFileName string
+
 	// The left end point of each window.
 	Windows []int
 
