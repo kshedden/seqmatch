@@ -1,7 +1,7 @@
 /*
-This is the entry point for all the scripts in this collection.
-Normally, this is the only script that will be run directly.  It calls
-the other scripts in turn.
+This script is the entry point for the Muscato project.  Normally,
+this is the only script that will be run directly.  It calls the other
+scripts in turn.
 */
 
 package main
@@ -73,9 +73,9 @@ func pipefromsz(fname string) string {
 	panic("unable to create pipe")
 }
 
-func sortsource() {
+func sortSource() {
 
-	logger.Printf("starting sortsource")
+	logger.Printf("starting sortSource")
 
 	logger.Printf("Running prep_reads %s %s", tmpjsonfile, tmpdir)
 	cmd0 := exec.Command("prep_reads", tmpjsonfile, tmpdir)
@@ -188,11 +188,11 @@ func sortsource() {
 	}
 
 	logger.Printf(fmt.Sprintf("Wrote %d read sequences", nseq))
-	logger.Printf("sortsource done")
+	logger.Printf("sortSource done")
 }
 
-func windowreads() {
-	logger.Printf("starting windowreads")
+func windowReads() {
+	logger.Printf("starting windowReads")
 
 	cmd := exec.Command("window_reads", tmpjsonfile, tmpdir)
 	cmd.Env = os.Environ()
@@ -202,12 +202,12 @@ func windowreads() {
 		panic(err)
 	}
 
-	logger.Printf("windowreads done")
+	logger.Printf("windowReads done")
 }
 
-func sortwindows() {
+func sortWindows() {
 
-	logger.Printf("starting sortwindows")
+	logger.Printf("starting sortWindows")
 
 	for k := 0; k < len(config.Windows); k++ {
 		f := fmt.Sprintf("win_%d.txt.sz", k)
@@ -247,11 +247,12 @@ func sortwindows() {
 		}
 	}
 
-	logger.Printf("sortwindows done")
+	logger.Printf("sortWindows done")
 }
 
-func makebloom() {
-	logger.Printf("starting bloom")
+func makeBloom() {
+	logger.Printf("starting makeBloom")
+
 	cmd := exec.Command("bloom", tmpjsonfile, tmpdir)
 	cmd.Env = os.Environ()
 	cmd.Stderr = os.Stderr
@@ -259,12 +260,12 @@ func makebloom() {
 	if err != nil {
 		panic(err)
 	}
-	logger.Printf("bloom done")
+	logger.Printf("makeBloom done")
 }
 
-func sortbloom() {
+func sortBloom() {
 
-	logger.Printf("starting sortbloom")
+	logger.Printf("starting sortBloom")
 
 	for k := range config.Windows {
 		f := fmt.Sprintf("bmatch_%d.txt.sz", k)
@@ -305,11 +306,12 @@ func sortbloom() {
 		}
 	}
 
-	logger.Printf("sortbloom done")
+	logger.Printf("sortBloom done")
 }
 
-func mergebloom() {
-	logger.Printf("starting mergebloom")
+func mergeBloom() {
+
+	logger.Printf("starting mergeBloom")
 	fp := 0
 	for {
 		nproc := config.MaxMergeProcs
@@ -341,7 +343,8 @@ func mergebloom() {
 		}
 		fp += nproc
 	}
-	logger.Printf("mergebloom done")
+
+	logger.Printf("mergeBloom done")
 }
 
 func writebest(lines []string, bfr [][]string, wtr io.Writer, ibuf []int, mmtol int) []int {
@@ -374,9 +377,9 @@ func writebest(lines []string, bfr [][]string, wtr io.Writer, ibuf []int, mmtol 
 	return ibuf
 }
 
-func combinewindows() {
+func combineWindows() {
 
-	logger.Printf("starting combinewindows")
+	logger.Printf("starting combineWindows")
 
 	mmtol := config.MMTol
 
@@ -479,12 +482,12 @@ func combinewindows() {
 	wtr.Close()
 	out.Close()
 
-	logger.Printf("combinewindows done")
+	logger.Printf("combineWindows done")
 }
 
-func sortbygeneid() {
+func sortByGeneId() {
 
-	logger.Printf("starting sortbygeneid")
+	logger.Printf("starting sortByGeneid")
 	inname := path.Join(tmpdir, "matches.txt.sz")
 	outname := path.Join(tmpdir, "matches_sg.txt.sz")
 
@@ -526,12 +529,12 @@ func sortbygeneid() {
 		}
 	}
 
-	logger.Printf("sortbygeneid done")
+	logger.Printf("sortbyGeneId done")
 }
 
-func joingenenames() {
+func joinGeneNames() {
 
-	logger.Printf("starting joingenenames")
+	logger.Printf("starting joinGeneNames")
 
 	// Decompress matches
 	ma := scipipe.NewProc("ma", fmt.Sprintf("sztool -d %s > {os:ma}", path.Join(tmpdir, "matches_sg.txt.sz")))
@@ -562,12 +565,12 @@ func joingenenames() {
 	wf.SetDriver(sz)
 	wf.Run()
 
-	logger.Printf("joingenenames done")
+	logger.Printf("joinGeneNames done")
 }
 
-func joinreadnames() {
+func joinReadNames() {
 
-	logger.Printf("starting joinreadnames")
+	logger.Printf("starting joinReadNames")
 
 	// The workflow hangs if the results file already exists, so
 	// remove it.
@@ -612,7 +615,7 @@ func joinreadnames() {
 	wf.SetDriver(snk)
 	wf.Run()
 
-	logger.Printf("joinreadnames done")
+	logger.Printf("joinReadNames done")
 }
 
 func setupLog() {
@@ -844,15 +847,12 @@ func makeTemp() {
 	}
 }
 
-func writenonmatch() {
+func writeNonMatch() {
 
-	logger.Print("Starting writenonmatch")
+	logger.Print("Starting writeNonMatch")
 
-	// Read match file
-	_, inname := path.Split(config.ReadFileName)
-	s := fmt.Sprintf("_%.0f_%d_%d_matches.txt", 100*config.PMatch, len(config.Windows), config.WindowWidth)
-	inname = strings.Replace(inname, ".fastq", s, 1)
-	inf, err := os.Open(inname)
+	// Reader for the match file
+	inf, err := os.Open(config.ResultsFileName)
 	if err != nil {
 		panic(err)
 	}
@@ -865,16 +865,20 @@ func writenonmatch() {
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 	for scanner.Scan() {
 		f := bytes.Fields(scanner.Bytes())
+		fmt.Printf("f=%v\n", f)
 		bf.Add(f[0])
 	}
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
 
-	// Nonmatch output file
-	_, outname := path.Split(config.ReadFileName)
-	s = fmt.Sprintf("_%.0f_%d_%d_nonmatches.fastq", 100*config.PMatch, len(config.Windows), config.WindowWidth)
-	outname = strings.Replace(outname, ".fastq", s, 1)
+	// Open the nonmatch output file
+	a, b := path.Split(config.ResultsFileName)
+	c := strings.Split(b, ".")
+	d := c[len(c)-1]
+	c[len(c)-1] = "nonmatch"
+	c = append(c, d)
+	outname := path.Join(a, strings.Join(c, "."))
 	out, err := os.Create(outname)
 	if err != nil {
 		panic(err)
@@ -883,6 +887,7 @@ func writenonmatch() {
 	wtr := bufio.NewWriter(out)
 	defer wtr.Flush()
 
+	// Check each read to see if it was matched.
 	rfname := path.Join(tmpdir, "reads_sorted.txt.sz")
 	inf, err = os.Open(rfname)
 	if err != nil {
@@ -921,52 +926,52 @@ func writenonmatch() {
 		}
 	}
 
-	logger.Printf("writenonmatch done")
+	logger.Printf("writeNonMatch done")
 }
 
 func run() {
 	if startpoint <= 0 {
-		sortsource()
+		sortSource()
 	}
 
 	if startpoint <= 1 {
-		windowreads()
+		windowReads()
 	}
 
 	if startpoint <= 2 {
-		sortwindows()
+		sortWindows()
 	}
 
 	if startpoint <= 3 {
-		makebloom()
+		makeBloom()
 	}
 
 	if startpoint <= 4 {
-		sortbloom()
+		sortBloom()
 	}
 
 	if startpoint <= 5 {
-		mergebloom()
+		mergeBloom()
 	}
 
 	if startpoint <= 6 {
-		combinewindows()
+		combineWindows()
 	}
 
 	if startpoint <= 7 {
-		sortbygeneid()
+		sortByGeneId()
 	}
 
 	if startpoint <= 8 {
-		joingenenames()
+		joinGeneNames()
 	}
 
 	if startpoint <= 9 {
-		joinreadnames()
+		joinReadNames()
 	}
 
 	if startpoint <= 10 {
-		writenonmatch()
+		writeNonMatch()
 	}
 }
 

@@ -37,4 +37,6 @@ Name = "muscato 1"
 Base = "data/muscato/00"
 Command = "runmatch"
 Opts = ["-ConfigFileName=data/muscato/00/config.json"]
-Files = [["result.txt", "result_e.txt"]]
+Files = [["result.txt", "result_e.txt"],
+         ["result.nonmatch.txt", "result.nonmatch_e.txt"]]
+Remove = ["tmp"]

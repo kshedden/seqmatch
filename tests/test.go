@@ -1,4 +1,4 @@
-// test is a script that runs a series of unit tests on the Muscatto code base.
+// test is a script that runs a series of unit tests on the Muscato code base.
 
 package main
 
@@ -28,6 +28,7 @@ type Test struct {
 	Opts    []string
 	Args    []string
 	Files   [][2]string
+	Remove  []string
 }
 
 func getTests() []Test {
@@ -149,6 +150,21 @@ func run(tests []Test) {
 		for _, fp := range t.Files {
 			compare(path.Join(t.Base, fp[0]), path.Join(t.Base, fp[1]))
 		}
+
+		// Clean up
+		if len(t.Remove) > 0 {
+			for _, d := range t.Remove {
+				u := path.Join(t.Base, d)
+				err := os.RemoveAll(path.Join(t.Base, d))
+				if err == nil {
+					logger.Printf("Removing %s...succeeded", u)
+				} else {
+					logger.Printf("Removing %s...failed:", u)
+					logger.Printf("  %v\n", err)
+				}
+			}
+		}
+
 		logger.Printf("done\n\n")
 	}
 }
