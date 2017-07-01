@@ -867,7 +867,6 @@ func writeNonMatch() {
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 	for scanner.Scan() {
 		f := bytes.Fields(scanner.Bytes())
-		fmt.Printf("f=%v\n", f)
 		bf.Add(f[0])
 	}
 	if err := scanner.Err(); err != nil {
