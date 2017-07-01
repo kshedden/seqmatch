@@ -575,11 +575,13 @@ func joinReadNames() {
 	// The workflow hangs if the results file already exists, so
 	// remove it.
 	_, err := os.Stat(config.ResultsFileName)
-	if err == nil || !os.IsNotExist(err) {
+	if err == nil {
 		err := os.Remove(config.ResultsFileName)
 		if err != nil {
 			panic(err)
 		}
+	} else if os.IsNotExist(err) {
+		// do nothing
 	} else {
 		panic(err)
 	}

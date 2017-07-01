@@ -1,4 +1,4 @@
-// prep_target converts a gene sequence file to a simple text format
+// prep_targets converts a gene sequence file to a simple text format
 // used internally by Muscato.  The ids and sequences are placed into
 // newline-delimited text files, with one id or sequence per row.
 //
@@ -236,7 +236,7 @@ func targets(genefile string, rev bool) {
 }
 
 func setupLog() {
-	fid, err := os.Create("prep_target.log")
+	fid, err := os.Create("prep_targets.log")
 	if err != nil {
 		panic(err)
 	}
@@ -250,8 +250,8 @@ func main() {
 	args := flag.Args()
 
 	if len(args) != 1 {
-		os.Stderr.WriteString("prep_target: usage\n")
-		os.Stderr.WriteString("  prep_target [-rev] genefile\n\n")
+		os.Stderr.WriteString("prep_targets: usage\n")
+		os.Stderr.WriteString("  prep_targets [-rev] genefile\n\n")
 		os.Exit(1)
 	}
 
