@@ -645,6 +645,7 @@ func handleArgs() {
 	ReadFileName := flag.String("ReadFileName", "", "Sequencing read file (fastq format)")
 	GeneFileName := flag.String("GeneFileName", "", "Gene file name (processed form)")
 	GeneIdFileName := flag.String("GeneIdFileName", "", "Gene ID file name (processed form)")
+	ResultsFileName := flag.String("ResultsFileName", "", "File name for results")
 	WindowsRaw := flag.String("Windows", "", "Starting position of each window")
 	WindowWidth := flag.Int("WindowWidth", 0, "Width of each window")
 	BloomSize := flag.Int("BloomSize", 0, "Size of Bloom filter, in bits")
@@ -713,6 +714,9 @@ func handleArgs() {
 	}
 	if *MMTol != 0 {
 		config.MMTol = *MMTol
+	}
+	if *ResultsFileName != "" {
+		config.ResultsFileName = *ResultsFileName
 	}
 
 	if config.ResultsFileName == "" {
