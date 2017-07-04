@@ -276,8 +276,9 @@ func searchpairs(source, match []*rec, limit chan bool) {
 			x := fmt.Sprintf("\t%d\t%d\t%s\n", mposi-len(mlft), nx, mgene)
 			bbuf.Write([]byte(x))
 
-			qq := &qrect{nx, bbuf.Bytes()}
+			qq := &qrect{mismatch: nx, gob: bbuf.Bytes()}
 			if first {
+				// Only retain first match
 				qvals = append(qvals, qq)
 				if len(qvals) > config.MaxMatches {
 					goto E
@@ -287,6 +288,8 @@ func searchpairs(source, match []*rec, limit chan bool) {
 					return qvals[i].mismatch > qq.mismatch
 				}
 				m := len(qvals)
+				// Insert the new match record into the list so that
+				// it remains sorted
 				if len(qvals) < config.MaxMatches {
 					if m == 0 {
 						qvals = append(qvals, qq)
@@ -312,10 +315,6 @@ func searchpairs(source, match []*rec, limit chan bool) {
 E:
 	for _, v := range qvals {
 		rsltChan <- v.gob
-	}
-
-	if len(match)*len(source) > 10000 {
-		logger.Printf("done with search")
 	}
 
 	for _, x := range source {

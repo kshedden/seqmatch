@@ -1,8 +1,13 @@
 // Identify possible matches of a set of source sequences into a set
-// of target sequences.
+// of target sequences.  The results may contain false positives, but
+// will not have any false negatives.
 //
-// The results may contain false positives, but will not have any
-// false negatives.
+// The results are saved in files named bmatch*.txt.sz, where * is the
+// window number.
+//
+// The format of the bmatch files is:
+//
+// (window sequence) (left tail) (right tail) (gene id) (position)
 
 package main
 

@@ -2,6 +2,7 @@
     "ReadFileName": "/scratch/andjoh_fluxm/tealfurn/CSCAR/PRT_NOV_15_02.fastq",
     "GeneFileName": "/scratch/andjoh_fluxm/tealfurn/CSCAR/ALL_ABFVV_Genes_Derep_tr.txt.sz",
     "GeneIdFileName": "/scratch/andjoh_fluxm/tealfurn/CSCAR/GeneId.txt.sz",
+    "ResultsFileName": "scratch/andjoh_fluxm/tealfurn/CSCAR/results.txt",
     "Windows": [0, 15, 30],
     "WindowWidth": 30,
     "MinReadLength": 50,

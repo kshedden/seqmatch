@@ -878,7 +878,7 @@ func writeNonMatch() {
 	c := strings.Split(b, ".")
 	d := c[len(c)-1]
 	c[len(c)-1] = "nonmatch"
-	c = append(c, d)
+	c = append(c, d+".fastq")
 	outname := path.Join(a, strings.Join(c, "."))
 	out, err := os.Create(outname)
 	if err != nil {
