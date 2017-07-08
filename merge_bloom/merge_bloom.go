@@ -13,19 +13,18 @@ import (
 	"log"
 	"os"
 	"path"
-	"runtime/pprof"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/golang/snappy"
 	"github.com/kshedden/seqmatch/utils"
+	"github.com/pkg/profile"
 )
 
 const (
 	concurrency = 100
 
-	profile = false
+	doProfile = true
 
 	// Maintain a pool of byte arrays of length bufsize
 	poolsize = 10000
@@ -278,36 +277,14 @@ func searchpairs(source, match []*rec, limit chan bool) {
 
 			qq := &qrect{mismatch: nx, gob: bbuf.Bytes()}
 			if first {
-				// Only retain first match
+				// Make no attempt to rank matches, just keep first ones.
 				qvals = append(qvals, qq)
 				if len(qvals) > config.MaxMatches {
 					goto E
 				}
 			} else {
-				f := func(i int) bool {
-					return qvals[i].mismatch > qq.mismatch
-				}
-				m := len(qvals)
-				// Insert the new match record into the list so that
-				// it remains sorted
-				if len(qvals) < config.MaxMatches {
-					if m == 0 {
-						qvals = append(qvals, qq)
-					} else {
-						j := sort.Search(m, f)
-						qvals = append(qvals, nil)
-						copy(qvals[j+1:m+1], qvals[j:m])
-						qvals[j] = qq
-					}
-				} else {
-					j := sort.Search(m, f)
-					if j < m-1 {
-						copy(qvals[j+1:m], qvals[j:m-1])
-					}
-					if j < m {
-						qvals[j] = qq
-					}
-				}
+				// A priority queue of top matches.
+				qvals = qinsert(qvals, qq)
 			}
 		}
 	}
@@ -353,15 +330,6 @@ func main() {
 		panic("wrong number of arguments")
 	}
 
-	if profile {
-		f, err := os.Create("merge_bloom_cpuprof")
-		if err != nil {
-			panic(err)
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-
 	config = utils.ReadConfig(os.Args[1])
 
 	if config.TempDir == "" {
@@ -378,6 +346,11 @@ func main() {
 		panic(err)
 	}
 	setupLog(win)
+
+	if doProfile && win == 0 {
+		p := profile.Start(profile.ProfilePath("."))
+		defer p.Stop()
+	}
 
 	f := fmt.Sprintf("win_%d_sorted.txt.sz", win)
 	sourcefile := path.Join(tmpdir, f)
@@ -447,11 +420,6 @@ func main() {
 lp:
 	for ii := 0; ; ii++ {
 
-		if profile && ii > 100000 {
-			logger.Printf("Breaking early for profile run")
-			break
-		}
-
 		if ii%100000 == 0 {
 			logger.Printf("%d", ii)
 		}
@@ -501,4 +469,33 @@ lp:
 	<-alldone
 
 	logger.Print("done")
+}
+
+// qinsert inserts a into the array q, maintaining a heap structure on
+// q in which the heap is ordered by decreasing mismatch values.  The
+// length of the heap is limited to MaxMatches.
+func qinsert(q []*qrect, a *qrect) []*qrect {
+
+	q = append(q, a)
+	ii := len(q) - 1 // Position of just-inserted node
+
+	for ii > 0 {
+		// Position of parent
+		jj := (ii - 1) / 2
+
+		if q[jj].mismatch > q[ii].mismatch {
+			q[jj], q[ii] = q[ii], q[jj]
+			ii = jj
+		} else {
+			break
+		}
+	}
+
+	// Not guaranteed to retain the best matches, but approximate
+	// and fast.
+	if len(q) > config.MaxMatches {
+		q = q[0:config.MaxMatches]
+	}
+
+	return q
 }
