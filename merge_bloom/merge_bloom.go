@@ -24,7 +24,7 @@ import (
 const (
 	concurrency = 100
 
-	doProfile = true
+	doProfile = false
 
 	// Maintain a pool of byte arrays of length bufsize
 	poolsize = 10000
